@@ -28,31 +28,33 @@ This is easily achieved by downloading
 Usage Example
 =============
 
-import board
-import neopixel
+.. code-block::
 
-from neosprite import Sprite
+    import board
+    import neopixel
 
-# We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
-NUMPIXELS = 32
-neopixels = neopixel.NeoPixel(board.D6, NUMPIXELS, brightness=0.2, auto_write=False)
+    from neosprite import Sprite
 
-# Load the sprite from a BMP file.
-sprite = Sprite.open('sprite.bmp')
+    # We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
+    NUMPIXELS = 32
+    neopixels = neopixel.NeoPixel(board.D6, NUMPIXELS, brightness=0.2, auto_write=False)
 
-# Set the size of the sprite to 8 pixels wide by 4 pixels tall.
-sprite.size = [8,4]
+    # Load the sprite from a BMP file.
+    sprite = Sprite.open('sprite.bmp')
 
-y = 0
-while True:
-  # Set the Y offset position into the sprite for the animation frame.
-  sprite.offset = [0,y]
-  
-  # Send the sprite RGB data to the NeoPixel array.
-  sprite.show(neopixels)
-  
-  # Increment the Y offset position to the next sprite animation frame.
-  y = (y + sprite.size[1]) % sprite.bitmapHeight
+    # Set the size of the sprite to 8 pixels wide by 4 pixels tall.
+    sprite.size = [8,4]
+
+    y = 0
+    while True:
+      # Set the Y offset position into the sprite for the animation frame.
+      sprite.offset = [0,y]
+      
+      # Send the sprite RGB data to the NeoPixel array.
+      sprite.show(neopixels)
+      
+      # Increment the Y offset position to the next sprite animation frame.
+      y = (y + sprite.size[1]) % sprite.bitmapHeight
 
 
 Contributing
