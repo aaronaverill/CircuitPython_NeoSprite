@@ -39,16 +39,19 @@ neopixels = neopixel.NeoPixel(board.D6, NUMPIXELS, brightness=0.2, auto_write=Fa
 
 # Load the sprite from a BMP file.
 sprite = Sprite.open('sprite.bmp')
-# Set the size of the sprite to 8 pixels wide by 4 pixels tall
+
+# Set the size of the sprite to 8 pixels wide by 4 pixels tall.
 sprite.size = [8,4]
 
 y = 0
 while True:
-  # Set the Y offset position into the sprite for the animation frame
+  # Set the Y offset position into the sprite for the animation frame.
   sprite.offset = [0,y]
-  # Send the sprite RGB data to the NeoPixel array
+  
+  # Send the sprite RGB data to the NeoPixel array.
   sprite.show(neopixels)
-  # Increment the Y offset position to the next sprite animation frame
+  
+  # Increment the Y offset position to the next sprite animation frame.
   y = (y + sprite.size[1]) % sprite.bitmapHeight
 
 
