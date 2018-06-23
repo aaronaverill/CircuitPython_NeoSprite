@@ -13,7 +13,7 @@ Introduction
     :target: https://travis-ci.org/aaronaverill/CircuitPython_neosprite
     :alt: Build Status
 
-.. todo:: Describe what the library does.
+Library for updating NeoPixel arrays from sprite files such as .BMP
 
 Dependencies
 =============
@@ -28,7 +28,29 @@ This is easily achieved by downloading
 Usage Example
 =============
 
-.. todo:: Add a quick, simple example. It and other examples should live in the examples folder and be included in docs/examples.rst.
+import board
+import neopixel
+
+from neosprite import Sprite
+
+# We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
+NUMPIXELS = 32
+neopixels = neopixel.NeoPixel(board.D6, NUMPIXELS, brightness=0.2, auto_write=False)
+
+# Load the sprite from a BMP file.
+sprite = Sprite.open('sprite.bmp')
+# Set the size of the sprite to 8 pixels wide by 4 pixels tall
+sprite.size = [8,4]
+
+y = 0
+while True:
+  # Set the Y offset position into the sprite for the animation frame
+  sprite.offset = [0,y]
+  # Send the sprite RGB data to the NeoPixel array
+  sprite.show(neopixels)
+  # Increment the Y offset position to the next sprite animation frame
+  y = (y + sprite.size[1]) % sprite.bitmapHeight
+
 
 Contributing
 ============
