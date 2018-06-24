@@ -78,65 +78,79 @@ class BmpSprite(object):
       self.paletteOffset = 14 + self.dibHeaderSize
     self.bitmapRowBytes = math.floor((self.bitsPerPixel * self.bitmapWidth + 31)/32) * 4
     self.bitmapBytesPerCol = self.bitsPerPixel / 8
+    if self.bitsPerPixel % 8 == 0:
+      self.bitmapBytesPerCol = int(self.bitmapBytesPerCol)
     self.size = [self.bitmapWidth, self.bitmapHeight]
     self.offset = [0, 0]
+    self.fillRgbFunc = getattr(self, '__fillRgbMatrix_' + str(self.bitsPerPixel))
         
     if self.dibHeaderSize != 40:
       raise ValueError('Cannot read bitmap header type = ' + str(self.dibHeaderSize))
     if self.bitmapCompression != 0:
       raise ValueError('Cannot read compression type = ' + str(self.bitmapCompression))
+    if self.bitsPerPixel not in [32, 24, 8, 4, 1]:
+      raise ValueError('Cannot read ' + str(self.bitsPerPixel) + ' bits per pixel')
 
-  def show(self, neopixels):
-    rgb = self.__getRgbMatrix()
-    self.__setNeopixelMaxtrix(neopixels, rgb)
-    neopixels.show()
-  
-  def __getRgbMatrix(self):
+  def getRgbMatrix(self):
+    """Return a two dimensional array of RGB tuples from the sprite region"""
     matrix = [[[0,0,0] for c in range(self.size[0])] for r in range(self.size[1])]
-    x = y = 0
       
     if self.topToBottom:
-      rowRange = range(self.offset[1], self.offset[1] + self.size[1])
+      rows = range(self.offset[1], self.offset[1] + self.size[1])
     else:
-      rowRange = range(self.bitmapHeight - self.offset[1] - 1, self.bitmapHeight - self.offset[1] - self.size[1] - 1, -1)
-
-    colRange = range(self.offset[0], self.offset[0] + self.size[0])
-    for row in rowRange:
-      x = 0
-      for col in colRange:
-        i = math.floor(self.pixelArrayOffset + row * self.bitmapRowBytes + col * self.bitmapBytesPerCol)
-        if self.bitsPerPixel == 24 or self.bitsPerPixel == 32:
-          bgr = self.data[i:i+3]
-        else:
-          if self.bitsPerPixel == 8:
-            paletteEntry = self.data[i]
-          elif self.bitsPerPixel == 4:
-            bitshift = 4 * (1 - (col % 2))
-            paletteEntry = (self.data[i] & (0xF << bitshift)) >> bitshift
-          elif self.bitsPerPixel == 1:
-            bitshift = 7 - (col % 8)
-            paletteEntry = (self.data[i] & (0x1 << bitshift)) >> bitshift
-          else:
-            raise ValueError('Cannot read ' + str(self.bitsPerPixel) + ' bits per pixel')
-              
-          paletteEntryOffset = self.paletteOffset + paletteEntry * 4
-          bgr = self.data[paletteEntryOffset:paletteEntryOffset+3]
-            
-        rgb = [bgr[2],bgr[1],bgr[0]]
-        matrix[y][x] = rgb
-        x += 1
-      y += 1
+      rows = range(self.bitmapHeight - self.offset[1] - 1, self.bitmapHeight - self.offset[1] - self.size[1] - 1, -1)
+    cols = range(self.offset[0], self.offset[0] + self.size[0])
+    
+    # Delegate to the speific bits per pixel function to fill the RGB matrix
+    self.fillRgbFunc(matrix, rows, cols)
 
     return matrix
   
-  def __setNeopixelMaxtrix(self, neopixels, rgb):
-    #print(rgb)    
-    
-    i = 0
-    for row in range(0, len(rgb)):
-      for col in range(0, len(rgb[row])): 
-        neopixels[i] = rgb[row][col]
-        i += 1
+  def __fillRgbMatrix_32(self, matrix, rows, cols):
+    self.__fillRgbMatrix_24(matrix, rows, cols)
+  
+  def __fillRgbMatrix_24(self, matrix, rows, cols):
+    y = 0
+    for row in rows:
+      x = 0
+      for col in cols:
+        i = self.pixelArrayOffset + row * self.bitmapRowBytes + col * self.bitmapBytesPerCol
+        matrix[y][x] = [self.data[i+2], self.data[i+1], self.data[i]]
+        x += 1
+      y += 1
+  
+  def __fillRgbMatrix_8(self, matrix, rows, cols):
+    y = 0
+    for row in rows:
+      x = 0
+      for col in cols:
+        i = self.pixelArrayOffset + row * self.bitmapRowBytes + col * self.bitmapBytesPerCol
+        i = self.paletteOffset + self.data[i] * 4
+        matrix[y][x] = [self.data[i+2], self.data[i+1], self.data[i]]
+        x += 1
+      y += 1
+
+  def __fillRgbMatrix_4(self, matrix, rows, cols):
+    self.__fillRgbMatrix_palette(matrix, rows, cols, 4)
+
+  def __fillRgbMatrix_1(self, matrix, rows, cols):
+    self.__fillRgbMatrix_palette(matrix, rows, cols, 1)
+
+  def __fillRgbMatrix_palette(self, matrix, rows, cols, bpp):
+    leftShift = int((8 / bpp) - 1)
+    modulo = int(8 / bpp)
+    bitMask = 2**bpp - 1
+    y = 0
+    for row in rows:
+      x = 0
+      for col in cols:
+        bitshift = bpp * (leftShift - (col % modulo))
+        i = int(self.pixelArrayOffset + row * self.bitmapRowBytes + col * self.bitmapBytesPerCol)
+        i = (self.data[i] & (bitMask << bitshift)) >> bitshift
+        i = self.paletteOffset + i * 4
+        matrix[y][x] = [self.data[i+2], self.data[i+1], self.data[i]]
+        x += 1
+      y += 1
   
 class Sprite(object):
   def open(filename):
