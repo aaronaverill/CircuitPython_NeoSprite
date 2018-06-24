@@ -33,28 +33,36 @@ Usage Example
     import board
     import neopixel
 
-    from neosprite import Sprite
+    import neosprite
 
     # We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
-    NUMPIXELS = 32
-    neopixels = neopixel.NeoPixel(board.D6, NUMPIXELS, brightness=0.2, auto_write=False)
+    # Create a NeoPixel object to control the Adafruit NeoPixel 4x8 RGB FeatherWing
+    matrixSize = [8,4]
+    neopixels = neopixel.NeoPixel(board.D6, matrixSize[0] * matrixSize[1], brightness=.1, auto_write=False)
+    neopixels.fill(0)
+    neopixels.show()
+
+    # Create a pixel strip object to manage the NeoPixel display
+    pixelStrip = neosprite.PixelStrip(neopixels)
 
     # Load the sprite from a BMP file.
-    sprite = Sprite.open('sprite.bmp')
+    sprite = neosprite.Sprite.open('sprite.bmp')
 
     # Set the size of the sprite to 8 pixels wide by 4 pixels tall.
-    sprite.size = [8,4]
+    sprite.size = matrixSize
 
     y = 0
     while True:
-      # Set the Y offset position into the sprite for the animation frame.
-      sprite.offset = [0,y]
-      
-      # Send the sprite RGB data to the NeoPixel array.
-      sprite.show(neopixels)
-      
-      # Increment the Y offset position to the next sprite animation frame.
-      y = (y + sprite.size[1]) % sprite.bitmapHeight
+      # Loop through the sprite animation frames vertically
+      for yPos in range(0, sprite.bitmapHeight, sprite.size[1]):
+        # Set the animation frame
+        sprite.offset = [0, yPos]
+        
+        # Get the RGB matrix from the sprite
+        rgb = sprite.getRgbMatrix()
+        
+        # Display the RGB data on the NeoPixels
+        pixelStrip.show(rgb)
 
 
 Contributing

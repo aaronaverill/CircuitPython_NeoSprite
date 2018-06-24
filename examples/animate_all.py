@@ -4,7 +4,7 @@ import neopixel
 import os
 import time
 
-from neosprite import Sprite
+import neosprite
 
 gc.collect()
 
@@ -31,6 +31,9 @@ neopixels = neopixel.NeoPixel(board.D6, matrixSize[0] * matrixSize[1], brightnes
 neopixels.fill(0)
 neopixels.show()
 
+# Create a pixel strip object to manage the NeoPixel display
+pixelStrip = neosprite.PixelStrip(neopixels)
+
 # Get all the images in the sprites folder
 spriteFolder = 'sprites'
 spriteFiles = getFilesRecursive(spriteFolder)
@@ -47,26 +50,19 @@ while True:
     
     # Load a new sprite
     print('Showing',spriteFile)
-    sprite = Sprite.open(spriteFile)
+    sprite = neosprite.Sprite.open(spriteFile)
     sprite.size = matrixSize
     
-    # Loop through the sprite vertically
+    # Loop through the sprite animation frames vertically
     for yPos in range(0, sprite.bitmapHeight, sprite.size[1]):
         # Set the animation frame
         sprite.offset = [0, yPos]
         
         # Get the RGB matrix from the sprite
         rgb = sprite.getRgbMatrix()
-  
-        # Loop through the RGB matrix and update the NeoPixels
-        rows = range(0, len(rgb))
-        cols = range(0, len(rgb[0]))
-        i = 0
-        for row in rows:
-            for col in cols: 
-                neopixels[i] = rgb[row][col]
-                i += 1
-        neopixels.show()
+        
+        # Display the RGB data on the NeoPixels
+        pixelStrip.show(rgb)
         
         # Pause for the animation frame delay
         if frameDelay:

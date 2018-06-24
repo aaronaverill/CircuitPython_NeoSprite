@@ -160,3 +160,33 @@ class Sprite(object):
     im = BmpSprite(fp)
     fp.close()
     return im
+
+class PixelStrip(object):
+  """A NeoPixel strip segment"""
+  
+  def __init__(self, neopixels):
+    self.neopixels = neopixels
+    self.range = [0, len(neopixels) - 1]
+  
+  def show(self, rgb):
+    self.__setPixels(rgb)
+    self.neopixels.show()
+
+  def __setPixels(self, rgb):
+    iFrom = abs(self.range[0])
+    iTo = abs(self.range[1])
+    if iFrom == iTo:
+      return
+    pixelLen = len(self.neopixels)
+    rows = range(0, len(rgb))
+    cols = range(0, len(rgb[0]))
+    i = iFrom
+    while True:
+      for row in rows:
+        for col in cols: 
+          self.neopixels[i] = rgb[row][col]
+          if i == iTo:
+            return
+          i += 1
+          if i >= pixelLen:
+            i = 0
