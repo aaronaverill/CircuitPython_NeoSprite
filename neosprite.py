@@ -147,37 +147,40 @@ class BmpSprite(object):
         for p in range(len(rgb)):
           data[i+2-p] = rgb[p]
 
-  def getPixelByteArray(self, channels = None):
+  def getPixelByteArray(self, channels = None, pixelRange = None):
     if channels is None:
       channels = Sprite.GRB
     bufferBpp = len(self.channelInfo[channels])
     buffer = bytearray(bufferBpp * self.size[0] * self.size[1])
-    self.fillPixelBytes(buffer, channels)
+    self.fillPixelBytes(buffer, channels, pixelRange)
     return buffer
   
-  def fillPixelBytes(self, buffer, channels = None):
+  def fillPixelBytes(self, buffer, channels = None, pixelRange = None):
     if channels is None:
       channels = Sprite.GRB
+    channelOffsets = self.channelInfo[channels]
+    bufferBpp = len(channelOffsets)
+    if pixelRange is None:
+      bufferLen = len(buffer)
+      pixelRange = (0, int(bufferLen / bufferBpp) - 1)
+
     if self.topToBottom:
       rows = range(self.offset[1], self.offset[1] + self.size[1])
     else:
       rows = range(self.bitmapHeight - self.offset[1] - 1, self.bitmapHeight - self.offset[1] - self.size[1] - 1, -1)
     cols = range(self.offset[0], self.offset[0] + self.size[0])
     
-    channelOffsets = self.channelInfo[channels]
-    bufferBpp = len(channelOffsets)
-    self.fillBytesFunc(rows, cols, buffer, channelOffsets, bufferBpp)
+    self.fillBytesFunc(rows, cols, buffer, channelOffsets, bufferBpp, pixelRange)
       
     return buffer
   
-  def __fillBytes_32(self, rows, cols, buffer, channelOffsets, bufferBpp):
-    self.__fillBytes_24(rows, cols, buffer, channelOffsets, bufferBpp)
+  def __fillBytes_32(self, rows, cols, buffer, channelOffsets, bufferBpp, pixelRange):
+    self.__fillBytes_24(rows, cols, buffer, channelOffsets, bufferBpp, pixelRange)
   
-  def __fillBytes_24(self, rows, cols, buffer, channelOffsets, bufferBpp):
-    bufferLen = len(buffer)
-    pixelRange = (0, int(bufferLen / bufferBpp) - 1)
-    p = pixelRange[0]
+  def __fillBytes_24(self, rows, cols, buffer, channelOffsets, bufferBpp, pixelRange):
+    p = pixelRange[0] * bufferBpp
     pEnd = pixelRange[1] * bufferBpp
+    bufferLen = len(buffer)
     while True:
       for row in rows:
         for col in cols:
@@ -201,55 +204,68 @@ class BmpSprite(object):
           if (p >= bufferLen):
             p = 0
   
-  def __fillBytes_8(self, rows, cols, buffer, channelOffsets, bufferBpp):
-    p = 0
-    for row in rows:
-      for col in cols:
-        i = row * self.bitmapRowBytes + col * self.bitmapBytesPerCol
-        i = 4 * self.pixelArrayData[i]
-        r = self.palette[i+2]
-        g = self.palette[i+1]
-        b = self.palette[i]
-        # Inner loop code is repeated to avoid function call overhead
-        w = 0
-        if bufferBpp == 4 and r == g and g == b:
-          w = r
-          r = g = b = 0
-        buffer[p+channelOffsets[0]] = r
-        buffer[p+channelOffsets[1]] = g
-        buffer[p+channelOffsets[2]] = b
-        if bufferBpp == 4:
-          buffer[p+channelOffsets[3]] = w
-        p += bufferBpp
+  def __fillBytes_8(self, rows, cols, buffer, channelOffsets, bufferBpp, pixelRange):
+    p = pixelRange[0] * bufferBpp
+    pEnd = pixelRange[1] * bufferBpp
+    bufferLen = len(buffer)
+    while True:
+      for row in rows:
+        for col in cols:
+          i = row * self.bitmapRowBytes + col * self.bitmapBytesPerCol
+          i = 4 * self.pixelArrayData[i]
+          r = self.palette[i+2]
+          g = self.palette[i+1]
+          b = self.palette[i]
+          # Inner loop code is repeated to avoid function call overhead
+          w = 0
+          if bufferBpp == 4 and r == g and g == b:
+            w = r
+            r = g = b = 0
+          buffer[p+channelOffsets[0]] = r
+          buffer[p+channelOffsets[1]] = g
+          buffer[p+channelOffsets[2]] = b
+          if bufferBpp == 4:
+            buffer[p+channelOffsets[3]] = w
+          if p == pEnd:
+            return
+          p += bufferBpp
+          if (p >= bufferLen):
+            p = 0
 
-  def __fillBytes_4(self, rows, cols, buffer, channelOffsets, bufferBpp):
-    self.__fillBytes_palette(rows, cols, buffer, 4, channelOffsets, bufferBpp)
+  def __fillBytes_4(self, rows, cols, buffer, channelOffsets, bufferBpp, pixelRange):
+    self.__fillBytes_palette(rows, cols, buffer, 4, channelOffsets, bufferBpp, pixelRange)
 
-  def __fillBytes_1(self, rows, cols, buffer, channelOffsets, bufferBpp):
-    self.__fillBytes_palette(rows, cols, buffer, 1, channelOffsets, bufferBpp)
+  def __fillBytes_1(self, rows, cols, buffer, channelOffsets, bufferBpp, pixelRange):
+    self.__fillBytes_palette(rows, cols, buffer, 1, channelOffsets, bufferBpp, pixelRange)
 
-  def __fillBytes_palette(self, rows, cols, buffer, bpp, channelOffsets, bufferBpp):
+  def __fillBytes_palette(self, rows, cols, buffer, bpp, channelOffsets, bufferBpp, pixelRange):
     leftShift = int((8 / bpp) - 1)
     modulo = int(8 / bpp)
     bitMask = 2**bpp - 1
-    p = 0
-    for row in rows:
-      for col in cols:
-        bitshift = bpp * (leftShift - (col % modulo))
-        i = int(row * self.bitmapRowBytes + col * self.bitmapBytesPerCol)
-        i = 4 * ((self.pixelArrayData[i] & (bitMask << bitshift)) >> bitshift)
-        r = self.palette[i+2]
-        g = self.palette[i+1]
-        b = self.palette[i]
-        # Inner loop code is repeated to avoid function call overhead
-        w = 0
-        if bufferBpp == 4 and r == g and g == b:
-          w = r
-          r = g = b = 0
-        buffer[p+channelOffsets[0]] = r
-        buffer[p+channelOffsets[1]] = g
-        buffer[p+channelOffsets[2]] = b
-        if bufferBpp == 4:
-          buffer[p+channelOffsets[3]] = w
-        p += bufferBpp
-  
+    p = pixelRange[0] * bufferBpp
+    pEnd = pixelRange[1] * bufferBpp
+    bufferLen = len(buffer)
+    while True:
+      for row in rows:
+        for col in cols:
+          bitshift = bpp * (leftShift - (col % modulo))
+          i = int(row * self.bitmapRowBytes + col * self.bitmapBytesPerCol)
+          i = 4 * ((self.pixelArrayData[i] & (bitMask << bitshift)) >> bitshift)
+          r = self.palette[i+2]
+          g = self.palette[i+1]
+          b = self.palette[i]
+          # Inner loop code is repeated to avoid function call overhead
+          w = 0
+          if bufferBpp == 4 and r == g and g == b:
+            w = r
+            r = g = b = 0
+          buffer[p+channelOffsets[0]] = r
+          buffer[p+channelOffsets[1]] = g
+          buffer[p+channelOffsets[2]] = b
+          if bufferBpp == 4:
+            buffer[p+channelOffsets[3]] = w
+          if p == pEnd:
+            return
+          p += bufferBpp
+          if (p >= bufferLen):
+            p = 0
