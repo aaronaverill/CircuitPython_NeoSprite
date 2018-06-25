@@ -164,38 +164,44 @@ class BmpSprite(object):
       rows = range(self.bitmapHeight - self.offset[1] - 1, self.bitmapHeight - self.offset[1] - self.size[1] - 1, -1)
     cols = range(self.offset[0], self.offset[0] + self.size[0])
     
-    self.fillBytesFunc(rows, cols, buffer, channels)
+    channelOffsets = self.channelInfo[channels]
+    bufferBpp = len(channelOffsets)
+    self.fillBytesFunc(rows, cols, buffer, channelOffsets, bufferBpp)
       
     return buffer
   
-  def __fillBytes_32(self, rows, cols, buffer, channels):
-    self.__fillBytes_24(rows, cols, buffer, channels)
+  def __fillBytes_32(self, rows, cols, buffer, channelOffsets, bufferBpp):
+    self.__fillBytes_24(rows, cols, buffer, channelOffsets, bufferBpp)
   
-  def __fillBytes_24(self, rows, cols, buffer, channels):
-    channelOffsets = self.channelInfo[channels]
-    bufferBpp = len(channelOffsets)
-    p = 0
-    for row in rows:
-      for col in cols:
-        i = row * self.bitmapRowBytes + col * self.bitmapBytesPerCol
-        r = self.pixelArrayData[i+2]
-        g = self.pixelArrayData[i+1]
-        b = self.pixelArrayData[i]
-        # Inner loop code is repeated to avoid function call overhead
-        w = 0
-        if bufferBpp == 4 and r == g and g == b:
-          w = r
-          r = g = b = 0
-        buffer[p+channelOffsets[0]] = r
-        buffer[p+channelOffsets[1]] = g
-        buffer[p+channelOffsets[2]] = b
-        if bufferBpp == 4:
-          buffer[p+channelOffsets[3]] = w
-        p += bufferBpp
+  def __fillBytes_24(self, rows, cols, buffer, channelOffsets, bufferBpp):
+    bufferLen = len(buffer)
+    pixelRange = (0, int(bufferLen / bufferBpp) - 1)
+    p = pixelRange[0]
+    pEnd = pixelRange[1] * bufferBpp
+    while True:
+      for row in rows:
+        for col in cols:
+          i = row * self.bitmapRowBytes + col * self.bitmapBytesPerCol
+          r = self.pixelArrayData[i+2]
+          g = self.pixelArrayData[i+1]
+          b = self.pixelArrayData[i]
+          # Inner loop code is repeated to avoid function call overhead
+          w = 0
+          if bufferBpp == 4 and r == g and g == b:
+            w = r
+            r = g = b = 0
+          buffer[p+channelOffsets[0]] = r
+          buffer[p+channelOffsets[1]] = g
+          buffer[p+channelOffsets[2]] = b
+          if bufferBpp == 4:
+            buffer[p+channelOffsets[3]] = w
+          if p == pEnd:
+            return
+          p += bufferBpp
+          if (p >= bufferLen):
+            p = 0
   
-  def __fillBytes_8(self, rows, cols, buffer, channels):
-    channelOffsets = self.channelInfo[channels]
-    bufferBpp = len(channelOffsets)
+  def __fillBytes_8(self, rows, cols, buffer, channelOffsets, bufferBpp):
     p = 0
     for row in rows:
       for col in cols:
@@ -216,15 +222,13 @@ class BmpSprite(object):
           buffer[p+channelOffsets[3]] = w
         p += bufferBpp
 
-  def __fillBytes_4(self, rows, cols, buffer, channels):
-    self.__fillBytes_palette(rows, cols, buffer, channels, 4)
+  def __fillBytes_4(self, rows, cols, buffer, channelOffsets, bufferBpp):
+    self.__fillBytes_palette(rows, cols, buffer, 4, channelOffsets, bufferBpp)
 
-  def __fillBytes_1(self, rows, cols, buffer, channels):
-    self.__fillBytes_palette(rows, cols, buffer, channels, 1)
+  def __fillBytes_1(self, rows, cols, buffer, channelOffsets, bufferBpp):
+    self.__fillBytes_palette(rows, cols, buffer, 1, channelOffsets, bufferBpp)
 
-  def __fillBytes_palette(self, rows, cols, buffer, channels, bpp):
-    channelOffsets = self.channelInfo[channels]
-    bufferBpp = len(channelOffsets)
+  def __fillBytes_palette(self, rows, cols, buffer, bpp, channelOffsets, bufferBpp):
     leftShift = int((8 / bpp) - 1)
     modulo = int(8 / bpp)
     bitMask = 2**bpp - 1
