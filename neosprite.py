@@ -51,6 +51,7 @@ Implementation Notes
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/aaronaverill/CircuitPython_neosprite.git"
 
+import array
 import gc
 import math
 import ustruct
@@ -100,7 +101,7 @@ class BmpSprite(object):
 
   def getRgbMatrix(self):
     """Return a two dimensional array of RGB tuples from the sprite region"""
-    matrix = [[0 for c in range(self.size[0])] for r in range(self.size[1])]
+    matrix = [array.array('L') for r in range(self.size[1])]
       
     if self.topToBottom:
       rows = range(self.offset[1], self.offset[1] + self.size[1])
@@ -122,10 +123,7 @@ class BmpSprite(object):
       x = 0
       for col in cols:
         i = row * self.bitmapRowBytes + col * self.bitmapBytesPerCol
-        #matrix[y][x] = self.pixelArrayData[i+2]
-        #matrix[y][x] = matrix[y][x] * 256 + self.pixelArrayData[i+1]
-        #matrix[y][x] = matrix[y][x] * 256 + self.pixelArrayData[i]
-        matrix[y][x] = (((int(self.pixelArrayData[i+2]) << 8) | int(self.pixelArrayData[i+1])) << 8) | int(self.pixelArrayData[i])
+        matrix[y].append((((int(self.pixelArrayData[i+2]) << 8) | int(self.pixelArrayData[i+1])) << 8) | int(self.pixelArrayData[i]))
         x += 1
       y += 1
   
@@ -136,7 +134,7 @@ class BmpSprite(object):
       for col in cols:
         i = row * self.bitmapRowBytes + col * self.bitmapBytesPerCol
         i = self.pixelArrayData[i] * 4
-        matrix[y][x] = (((int(self.palette[i+2]) << 8) | int(self.palette[i+1])) << 8) | int(self.palette[i])
+        matrix[y].append((((int(self.palette[i+2]) << 8) | int(self.palette[i+1])) << 8) | int(self.palette[i]))
         x += 1
       y += 1
 
@@ -158,7 +156,7 @@ class BmpSprite(object):
         i = int(row * self.bitmapRowBytes + col * self.bitmapBytesPerCol)
         i = (self.pixelArrayData[i] & (bitMask << bitshift)) >> bitshift
         i *= 4
-        matrix[y][x] = (((int(self.palette[i+2]) << 8) | int(self.palette[i+1])) << 8) | int(self.palette[i])
+        matrix[y].append((((int(self.palette[i+2]) << 8) | int(self.palette[i+1])) << 8) | int(self.palette[i]))
         x += 1
       y += 1
   
