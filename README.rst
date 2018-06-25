@@ -38,18 +38,20 @@ Usage Example
     # We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
     # Create a NeoPixel object to control the Adafruit NeoPixel 4x8 RGB FeatherWing
     matrixSize = [8,4]
-    neopixels = neopixel.NeoPixel(board.D6, matrixSize[0] * matrixSize[1], brightness=.1, auto_write=False)
+    neopixels = neopixel.NeoPixel(board.D6, matrixSize[0] * matrixSize[1], auto_write=False)
     neopixels.fill(0)
     neopixels.show()
-
-    # Create a pixel strip object to manage the NeoPixel display
-    pixelStrip = neosprite.PixelStrip(neopixels)
 
     # Load the sprite from a BMP file.
     sprite = neosprite.Sprite.open('sprite.bmp')
 
     # Set the size of the sprite to 8 pixels wide by 4 pixels tall.
     sprite.size = matrixSize
+
+    # Adjust the brightness
+    brightness = 0.1 # 10%
+    setBrightness = lambda rgb: (int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness))
+    sprite.transformRgb(setBrightness)
 
     y = 0
     while True:
@@ -58,11 +60,9 @@ Usage Example
         # Set the animation frame
         sprite.offset = [0, yPos]
         
-        # Get the RGB matrix from the sprite
-        rgb = sprite.getRgbMatrix()
-        
         # Display the RGB data on the NeoPixels
-        pixelStrip.show(rgb)
+        sprite.fillPixelBytes(neopixels.buf, channels=neosprite.Sprite.GRB)
+        neopixels.show()
 
 
 Contributing
