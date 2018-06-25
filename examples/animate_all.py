@@ -10,16 +10,16 @@ gc.collect()
 
 # Helper function to recursively search a folder for all files and return the full path
 def getFilesRecursive(folder):
-    files = []
-    folderFiles = os.listdir(folder)
-    for file in folderFiles:
-        filePath = folder + os.sep + file
-        fileStat = os.stat(filePath)
-        if fileStat[0] & 0o170000 == 0o040000:
-            files.extend(getFilesRecursive(filePath))
-        else:
-            files.append(filePath)
-    return files
+  files = []
+  folderFiles = os.listdir(folder)
+  for file in folderFiles:
+    filePath = folder + os.sep + file
+    fileStat = os.stat(filePath)
+    if fileStat[0] & 0o170000 == 0o040000:
+      files.extend(getFilesRecursive(filePath))
+    else:
+      files.append(filePath)
+  return files
 
 # Turn off internal NeoPixel
 dot = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0)
@@ -55,15 +55,15 @@ while True:
     
     # Loop through the sprite animation frames vertically
     for yPos in range(0, sprite.bitmapHeight, sprite.size[1]):
-        # Set the animation frame
-        sprite.offset = [0, yPos]
-        
-        # Get the RGB matrix from the sprite
-        rgb = sprite.getRgbMatrix()
-        
-        # Display the RGB data on the NeoPixels
-        pixelStrip.show(rgb)
-        
-        # Pause for the animation frame delay
-        if frameDelay:
-            time.sleep(frameDelay)
+      # Set the animation frame
+      sprite.offset = [0, yPos]
+      
+      # Get the RGB matrix from the sprite
+      rgb = sprite.getRgbMatrix()
+      
+      # Display the RGB data on the NeoPixels
+      pixelStrip.show(rgb)
+      
+      # Pause for the animation frame delay
+      if frameDelay:
+        time.sleep(frameDelay)
