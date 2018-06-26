@@ -9,10 +9,6 @@ import neosprite
 
 gc.collect()
 
-# Create a button on D10
-button = digitalio.DigitalInOut(board.D10)
-button.pull = digitalio.Pull.UP
-
 # Helper function to recursively search a folder for all files and return the full path
 def getFilesRecursive(folder):
   files = []
@@ -26,6 +22,32 @@ def getFilesRecursive(folder):
       files.append(filePath)
   return files
 
+# Helper function to calculate the total brightness percentage of the entire sprite
+def calcTotalBrightness(sprite, channels = None):
+  # Save the current size and offset
+  size = sprite.size
+  offset = sprite.offset
+  # Set the size to the entire bitmap and offset to the top, left
+  sprite.size = [sprite.bitmapWidth, sprite.bitmapHeight]
+  sprite.offset = [0,0]
+  # Get the pixel bytes
+  pixelBytes = sprite.getPixelByteArray(channels)
+  # Restore the size
+  sprite.size = size
+  sprite.offset = offset
+  
+  percent = 0
+  for i in range(len(pixelBytes)):
+      percent += pixelBytes[i]
+      
+  return percent / len(pixelBytes) / 0xFF
+
+# Main Program
+
+# Create a button on D10
+button = digitalio.DigitalInOut(board.D10)
+button.pull = digitalio.Pull.UP
+
 # Turn off internal NeoPixel
 dot = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0)
 dot.fill(0)
@@ -33,7 +55,8 @@ dot = None
 
 # Create a NeoPixel object to control the Adafruit NeoPixel 4x8 RGB FeatherWing
 matrixSize = [8,4]
-neopixels = neopixel.NeoPixel(board.D6, matrixSize[0] * matrixSize[1], auto_write=False)
+numPixels = matrixSize[0] * matrixSize[1]
+neopixels = neopixel.NeoPixel(board.D6, numPixels, auto_write=False)
 neopixels.fill(0)
 neopixels.show()
 
@@ -68,6 +91,12 @@ while True:
       setBrightness = lambda rgb: (int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness))
       sprite.transformRgb(setBrightness)
 
+    # Calculate and display the current necessary while this sprite is animating
+    mAPerPixel = 60
+    percent = calcTotalBrightness(sprite, channels=neosprite.Sprite.GRB)
+    current = mAPerPixel * numPixels * percent
+    print('percent:',percent,' current:',round(current),'mA')
+    
     #gc.collect()
     print('mem usage:',gc.mem_alloc(),', mem free:',gc.mem_free())
     
