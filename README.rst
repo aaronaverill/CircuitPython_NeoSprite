@@ -15,11 +15,23 @@ Introduction
 
 Library for updating NeoPixel arrays from sprite files such as .BMP
 
+Using this library you can show simple animations on a pixel matrix or pixel strip. Looping 
+marquee (chase) animations can be easily implemented. Or you can modify the palette
+or pixel data of a sprite bitmap in memory to achieve animations. 
+
+Sprite files can be stored on the flash memory and loaded when activated by user interaction 
+(a button press for example). There is sample code to search for all sprites in a folder
+and show each one.
+
+The library accesses the pixel buffer directly to write data, allowing you to achieve 1800+ 
+pixel updates per second.
+
 Dependencies
 =============
 This driver depends on:
 
 * `Adafruit CircuitPython <https://github.com/adafruit/circuitpython>`_
+* `Adafruit CircuitPython NeoPixel <https://github.com/adafruit/Adafruit_CircuitPython_NeoPixel>`_
 
 Please ensure all dependencies are available on the CircuitPython filesystem.
 This is easily achieved by downloading
@@ -27,6 +39,43 @@ This is easily achieved by downloading
 
 Usage Example
 =============
+
+This example demonstrates how to load a sprite and animate through the frames. Copy the 8 pixel wide sprite.bmp
+file to your flash drive.
+
+.. code-block::
+
+    import board
+    import neopixel
+
+    import neosprite
+
+    # We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
+    # Create a NeoPixel object to control the Adafruit NeoPixel 4x8 RGB FeatherWing
+    matrixSize = [8,4]
+    neopixels = neopixel.NeoPixel(board.D6, matrixSize[0] * matrixSize[1], auto_write=False)
+    neopixels.fill(0)
+    neopixels.show()
+
+    # Load the sprite from a BMP file.
+    sprite = neosprite.Sprite.open('sprite.bmp')
+
+    # Set the size of the sprite to 8 pixels wide by 4 pixels tall.
+    sprite.size = matrixSize
+
+    while True:
+      # Loop through the sprite animation frames vertically
+      for yPos in range(0, sprite.bitmapHeight, sprite.size[1]):
+        # Set the animation frame
+        sprite.offset = [0, yPos]
+        
+        # Display the RGB data on the NeoPixels
+        sprite.fillPixelBytes(neopixels.buf)
+        neopixels.show()
+
+This example demonstrates how to set the brightness of a sprite. Modifying the pixel data once at the start instead
+of every time the pixels are refreshed allows much faster animations. Copy the 8 pixel wide sprite.bmp
+file to your flash drive.
 
 .. code-block::
 
@@ -53,7 +102,6 @@ Usage Example
     setBrightness = lambda rgb: (int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness))
     sprite.transformRgb(setBrightness)
 
-    y = 0
     while True:
       # Loop through the sprite animation frames vertically
       for yPos in range(0, sprite.bitmapHeight, sprite.size[1]):
@@ -63,8 +111,38 @@ Usage Example
         # Display the RGB data on the NeoPixels
         sprite.fillPixelBytes(neopixels.buf)
         neopixels.show()
+        
+This example demostrates a simple chase animation for a pixel strip. Copy the 8 pixel wide sprite.bmp
+file to your flash drive.
 
+.. code-block::
 
+    import board
+    import neopixel
+
+    import neosprite
+
+    # Create a NeoPixel object to control a 50 pixel strip
+    numPixels = 50
+    neopixels = neopixel.NeoPixel(board.D6, numPixels, auto_write=False)
+    neopixels.fill(0)
+    neopixels.show()
+
+    # Load the sprite from a BMP file.
+    sprite = neosprite.Sprite.open('sprite.bmp')
+
+    # Set the size of the sprite to 8 pixels wide by 1 pixels tall.
+    sprite.size = [8, 1]
+    
+    range = (0, numPixels - 1)
+    while True:
+      # Display the RGB data on the NeoPixels
+      sprite.fillPixelBytes(neopixels.buf, pixelRange = range)
+      neopixels.show()
+      
+      # Advance one position
+      range = ((range[0] + 1) % numPixels, (range[1] + 1) % numPixels)
+            
 Contributing
 ============
 
