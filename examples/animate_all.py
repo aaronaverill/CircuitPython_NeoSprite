@@ -93,7 +93,7 @@ while True:
 
     # Calculate and display the current necessary while this sprite is animating
     mAPerPixel = 60
-    percent = calcTotalBrightness(sprite, channels=neosprite.Sprite.GRB)
+    percent = calcTotalBrightness(sprite, channels=PixelLayout.NeoPixel_GRB)
     current = mAPerPixel * numPixels * percent
     print('percent:',percent,' current:',round(current),'mA')
     
@@ -110,7 +110,7 @@ while True:
         sprite.offset = [0, yPos]
         
         # Display the RGB data on the NeoPixels
-        sprite.fillPixelBytes(neopixels.buf, channels=neosprite.Sprite.GRB)
+        sprite.fillPixelBytes(neopixels.buf, channels=PixelLayout.NeoPixel_GRB)
         neopixels.show()
       
         frames += 1

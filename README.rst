@@ -61,7 +61,7 @@ Usage Example
         sprite.offset = [0, yPos]
         
         # Display the RGB data on the NeoPixels
-        sprite.fillPixelBytes(neopixels.buf, channels=neosprite.Sprite.GRB)
+        sprite.fillPixelBytes(neopixels.buf)
         neopixels.show()
 
 
