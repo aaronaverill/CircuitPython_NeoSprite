@@ -24,7 +24,7 @@ Sprite files can be stored on the flash memory and loaded when activated by user
 and show each one.
 
 The library accesses the pixel buffer directly to write data, allowing you to achieve 1800+ 
-pixel updates per second.
+pixel updates per second for example with a ATSAMD21G18 @ 48MHz such as the Adafruit Express M0.
 
 Dependencies
 =============
@@ -41,7 +41,7 @@ Usage Example
 =============
 
 This example demonstrates how to load a sprite and animate through the frames. Copy the 8 pixel wide sprite.bmp
-file to your flash drive.
+file from examples/sprites/matrix-4x8 to your SPI flash storage.
 
 .. code-block::
 
@@ -75,7 +75,7 @@ file to your flash drive.
 
 This example demonstrates how to set the brightness of a sprite. Modifying the pixel data once at the start instead
 of every time the pixels are refreshed allows much faster animations. Copy the 8 pixel wide sprite.bmp
-file to your flash drive.
+file from examples/sprites/matrix-4x8 to your SPI flash storage.
 
 .. code-block::
 
@@ -113,7 +113,7 @@ file to your flash drive.
         neopixels.show()
         
 This example demostrates a simple chase animation for a pixel strip. Copy the 8 pixel wide sprite.bmp
-file to your flash drive.
+file from examples/sprites/matrix-4x8 to your SPI flash storage.
 
 .. code-block::
 
