@@ -23,7 +23,7 @@ Sprite files can be stored on the flash memory and loaded when activated by user
 (a button press for example). There is sample code to search for all sprites in a folder
 and show each one.
 
-The library accesses the pixel buffer directly to write data, allowing you to achieve 1800+ 
+The library accesses the pixel buffer directly to write data, allowing you to achieve 2500 
 pixel updates per second for example with a ATSAMD21G18 @ 48MHz such as the Adafruit Express M0.
 
 Dependencies
@@ -41,21 +41,19 @@ Usage Example
 =============
 
 This example demonstrates how to load a sprite and animate through the frames. Copy the 8 pixel wide sprite.bmp
-file from examples/sprites/matrix-4x8 to your SPI flash storage.
+file from examples/sprites/matrix-4x8 to your flash storage.
 
 .. code-block::
 
     import board
     import neopixel
-
     import neosprite
 
     # We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
     # Create a NeoPixel object to control the Adafruit NeoPixel 4x8 RGB FeatherWing
     matrixSize = [8,4]
-    neopixels = neopixel.NeoPixel(board.D6, matrixSize[0] * matrixSize[1], auto_write=False)
-    neopixels.fill(0)
-    neopixels.show()
+    numPixels = matrixSize[0] * matrixSize[1]
+    neopixels = neopixel.NeoPixel(board.D6, numPixels, auto_write=False)
 
     # Load the sprite from a BMP file.
     sprite = neosprite.Sprite.open('sprite.bmp')
@@ -75,21 +73,19 @@ file from examples/sprites/matrix-4x8 to your SPI flash storage.
 
 This example demonstrates how to set the brightness of a sprite. Modifying the pixel data once at the start instead
 of every time the pixels are refreshed allows much faster animations. Copy the 8 pixel wide sprite.bmp
-file from examples/sprites/matrix-4x8 to your SPI flash storage.
+file from examples/sprites/matrix-4x8 to your flash storage.
 
 .. code-block::
 
     import board
     import neopixel
-
     import neosprite
 
     # We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
     # Create a NeoPixel object to control the Adafruit NeoPixel 4x8 RGB FeatherWing
     matrixSize = [8,4]
-    neopixels = neopixel.NeoPixel(board.D6, matrixSize[0] * matrixSize[1], auto_write=False)
-    neopixels.fill(0)
-    neopixels.show()
+    numPixels = matrixSize[0] * matrixSize[1]
+    neopixels = neopixel.NeoPixel(board.D6, numPixels, auto_write=False)
 
     # Load the sprite from a BMP file.
     sprite = neosprite.Sprite.open('sprite.bmp')
@@ -113,20 +109,17 @@ file from examples/sprites/matrix-4x8 to your SPI flash storage.
         neopixels.show()
         
 This example demostrates a simple chase animation for a pixel strip. Copy the 8 pixel wide sprite.bmp
-file from examples/sprites/matrix-4x8 to your SPI flash storage.
+file from examples/sprites/matrix-4x8 to your flash storage.
 
 .. code-block::
 
     import board
     import neopixel
-
     import neosprite
 
     # Create a NeoPixel object to control a 50 pixel strip
     numPixels = 50
     neopixels = neopixel.NeoPixel(board.D6, numPixels, auto_write=False)
-    neopixels.fill(0)
-    neopixels.show()
 
     # Load the sprite from a BMP file.
     sprite = neosprite.Sprite.open('sprite.bmp')
@@ -142,7 +135,17 @@ file from examples/sprites/matrix-4x8 to your SPI flash storage.
       
       # Advance one position
       range = ((range[0] + 1) % numPixels, (range[1] + 1) % numPixels)
-            
+
+Performance considerations
+================
+
+Memory usage
+----------
+
+Animation speed
+----------
+
+      
 Contributing
 ============
 
@@ -153,49 +156,13 @@ before contributing to help this project stay welcoming.
 Building locally
 ================
 
-Zip release files
------------------
+To precompile the python files use the mpy-cross tool.
 
 To build this library locally you'll need to install the
 `circuitpython-build-tools <https://github.com/adafruit/circuitpython-build-tools>`_ package.
 
 .. code-block:: shell
 
-    python3 -m venv .env
-    source .env/bin/activate
-    pip install circuitpython-build-tools
+    mpy-cross neosprite.py
 
-Once installed, make sure you are in the virtual environment:
-
-.. code-block:: shell
-
-    source .env/bin/activate
-
-Then run the build:
-
-.. code-block:: shell
-
-    circuitpython-build-bundles --filename_prefix circuitpython-neosprite --library_location .
-
-Sphinx documentation
------------------------
-
-Sphinx is used to build the documentation based on rST files and comments in the code. First,
-install dependencies (feel free to reuse the virtual environment from above):
-
-.. code-block:: shell
-
-    python3 -m venv .env
-    source .env/bin/activate
-    pip install Sphinx sphinx-rtd-theme
-
-Now, once you have the virtual environment activated:
-
-.. code-block:: shell
-
-    cd docs
-    sphinx-build -E -W -b html . _build/html
-
-This will output the documentation to ``docs/_build/html``. Open the index.html in your browser to
-view them. It will also (due to -W) error out on any warning like Travis will. This is a good way to
-locally verify it will pass.
+Once compiled, copy the generated neosprite.mpy file to your board flash storage root folder.
