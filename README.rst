@@ -40,8 +40,9 @@ This is easily achieved by downloading
 Usage Example
 =============
 
-This example demonstrates how to load a sprite and animate through the frames. Copy the 8 pixel wide sprite.bmp
-file from examples/sprites/matrix-4x8 to your flash storage.
+This example demonstrates how to load and animate a sprite from a BMP file that contains animation frames arranged vertically. The example assumes you are using a NeoPixel 4x8 matrix array such as the FeatherWing. Copy the 8 pixel wide 'sprite.bmp' file from 'examples/sprites/matrix-4x8' folder to your flash storage root folder.
+
+If you don't have a 4x8 NeoPixel matrix don't worry you can still see the animation on a LED strip it will just look a bit wonky.
 
 .. code-block::
 
@@ -49,11 +50,13 @@ file from examples/sprites/matrix-4x8 to your flash storage.
     import neopixel
     import neosprite
 
+    brightness = 0.1 # 10%
+
     # We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
     # Create a NeoPixel object to control the Adafruit NeoPixel 4x8 RGB FeatherWing
     matrixSize = [8,4]
     numPixels = matrixSize[0] * matrixSize[1]
-    neopixels = neopixel.NeoPixel(board.D6, numPixels, auto_write=False)
+    neopixels = neopixel.NeoPixel(board.D6, numPixels, brightness=brightness, auto_write=False)
 
     # Load the sprite from a BMP file.
     sprite = neosprite.Sprite.open('sprite.bmp')
@@ -71,9 +74,11 @@ file from examples/sprites/matrix-4x8 to your flash storage.
         sprite.fillPixelBytes(neopixels.buf)
         neopixels.show()
 
-This example demonstrates how to set the brightness of a sprite. Modifying the pixel data once at the start instead
-of every time the pixels are refreshed allows much faster animations. Copy the 8 pixel wide sprite.bmp
-file from examples/sprites/matrix-4x8 to your flash storage.
+This example demonstrates how to set the brightness of a sprite by modifying the bitmap RGB data once at the start of the program and using the default full brightness (1.0) in the NeoPixel. 
+
+When the brightness of the NeoPixel object is set to 100% it avoids a bytearray allocation, memory read, floating point multiplication and memory assignment for every pixel on every animation frame. You should see a significant animation speed improvement with this code change.
+
+Copy the 8 pixel wide 'sprite.bmp' file from 'examples/sprites/matrix-4x8' folder to your flash storage root folder.
 
 .. code-block::
 
@@ -81,6 +86,8 @@ file from examples/sprites/matrix-4x8 to your flash storage.
     import neopixel
     import neosprite
 
+    brightness = 0.1 # 10%
+    
     # We are using the NeoPixel Featherwing 4x8 https://www.adafruit.com/product/2945
     # Create a NeoPixel object to control the Adafruit NeoPixel 4x8 RGB FeatherWing
     matrixSize = [8,4]
@@ -93,8 +100,7 @@ file from examples/sprites/matrix-4x8 to your flash storage.
     # Set the size of the sprite to 8 pixels wide by 4 pixels tall.
     sprite.size = matrixSize
 
-    # Adjust the brightness
-    brightness = 0.1 # 10%
+    # Adjust the brightness of the bitmap RGB data in memory
     setBrightness = lambda rgb: (int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness))
     sprite.transformRgb(setBrightness)
 
@@ -108,8 +114,9 @@ file from examples/sprites/matrix-4x8 to your flash storage.
         sprite.fillPixelBytes(neopixels.buf)
         neopixels.show()
         
-This example demostrates a simple chase animation for a pixel strip. Copy the 8 pixel wide sprite.bmp
-file from examples/sprites/matrix-4x8 to your flash storage.
+This example demonstrates a simple chase animation for a pixel strip. Instead of animating through the sprite data we are incrementing the (start,end) range at each loop. The fillPixelBytes() method will tile the 10 pixel sprite across the entire 50 pixel strip and wrap the tiled bitmap around from the end of the strip to the start. 
+
+Copy the 10 pixel wide 'red-comet.bmp' file from 'examples/sprites/strip-10' to your flash storage.
 
 .. code-block::
 
@@ -122,7 +129,7 @@ file from examples/sprites/matrix-4x8 to your flash storage.
     neopixels = neopixel.NeoPixel(board.D6, numPixels, auto_write=False)
 
     # Load the sprite from a BMP file.
-    sprite = neosprite.Sprite.open('sprite.bmp')
+    sprite = neosprite.Sprite.open('red-comet.bmp')
 
     # Set the size of the sprite to 1 pixel tall.
     sprite.size = [sprite.size[0], 1]
@@ -133,7 +140,7 @@ file from examples/sprites/matrix-4x8 to your flash storage.
       sprite.fillPixelBytes(neopixels.buf, pixelRange = range)
       neopixels.show()
       
-      # Advance one position
+      # Advance the output buffer range one position
       range = ((range[0] + 1) % numPixels, (range[1] + 1) % numPixels)
 
 Performance considerations
@@ -145,7 +152,7 @@ Memory usage
 Animation speed
 ----------
 
-      
+
 Contributing
 ============
 
