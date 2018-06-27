@@ -124,8 +124,8 @@ file from examples/sprites/matrix-4x8 to your flash storage.
     # Load the sprite from a BMP file.
     sprite = neosprite.Sprite.open('sprite.bmp')
 
-    # Set the size of the sprite to 8 pixels wide by 1 pixels tall.
-    sprite.size = [8, 1]
+    # Set the size of the sprite to 1 pixel tall.
+    sprite.size = [sprite.size[0], 1]
     
     range = (0, numPixels - 1)
     while True:
