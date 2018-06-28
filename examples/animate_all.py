@@ -72,6 +72,7 @@ loopAnimation = True
 #frameDelay = 0.1
 frameDelay = 0
 
+totalCurrent = 0
 clicked = False
 
 while True:
@@ -95,7 +96,7 @@ while True:
     mAPerPixel = 60
     percent = calcTotalBrightness(sprite, channels=neosprite.PixelLayout.NeoPixel_GRB)
     current = mAPerPixel * numPixels * percent
-    print('percent:',percent,' current:',round(current),'mA')
+    print('brightness:',percent,' current:',round(current),'mA')
     
     #gc.collect()
     print('mem usage:',gc.mem_alloc(),', mem free:',gc.mem_free())
@@ -132,6 +133,8 @@ while True:
           break
           
     end = time.monotonic()
-    fps = frames / (end - start)
+    duration = end - start
+    fps = frames / duration
     pixelsPerSecond = len(neopixels) * fps
-    print('fps:',fps,', pps:',pixelsPerSecond)
+    totalCurrent += current * duration / 3600
+    print('fps:',fps,', pps:',pixelsPerSecond,', total current:',totalCurrent,'mAh')
