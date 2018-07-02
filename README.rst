@@ -59,7 +59,7 @@ If you don't have a 4x8 NeoPixel matrix don't worry you can still see the animat
     neopixels = neopixel.NeoPixel(board.D6, numPixels, brightness=brightness, auto_write=False)
 
     # Load the sprite from a BMP file.
-    sprite = neosprite.Sprite.open('sprite.bmp')
+    sprite = neosprite.BmpSprite.open('sprite.bmp')
 
     # Set the size of the sprite to 8 pixels wide by 4 pixels tall.
     sprite.size = matrixSize
@@ -71,7 +71,7 @@ If you don't have a 4x8 NeoPixel matrix don't worry you can still see the animat
         sprite.offset = [0, yPos]
         
         # Display the RGB data on the NeoPixels
-        sprite.fillPixelBytes(neopixels.buf)
+        sprite.fillBuffer(neopixels.buf)
         neopixels.show()
 
 This example demonstrates how to set the brightness of a sprite by modifying the bitmap RGB data once at the start of the program and using the default full brightness (1.0) in the NeoPixel. 
@@ -95,7 +95,7 @@ Copy the 8 pixel wide 'sprite.bmp' file from 'examples/sprites/matrix-4x8' folde
     neopixels = neopixel.NeoPixel(board.D6, numPixels, auto_write=False)
 
     # Load the sprite from a BMP file.
-    sprite = neosprite.Sprite.open('sprite.bmp')
+    sprite = neosprite.BmpSprite.open('sprite.bmp')
 
     # Set the size of the sprite to 8 pixels wide by 4 pixels tall.
     sprite.size = matrixSize
@@ -111,10 +111,10 @@ Copy the 8 pixel wide 'sprite.bmp' file from 'examples/sprites/matrix-4x8' folde
         sprite.offset = [0, yPos]
         
         # Display the RGB data on the NeoPixels
-        sprite.fillPixelBytes(neopixels.buf)
+        sprite.fillBuffer(neopixels.buf)
         neopixels.show()
         
-This example demonstrates a simple chase animation for a pixel strip. Instead of animating through the sprite data we are incrementing the (start,end) range at each loop. The fillPixelBytes() method will tile the 10 pixel sprite across the entire 50 pixel strip and wrap the tiled bitmap around from the end of the strip to the start. 
+This example demonstrates a simple chase animation for a pixel strip. Instead of animating through the sprite data we are incrementing the (start,end) range at each loop. The fillBuffer() method will tile the 10 pixel sprite across the entire 50 pixel strip and wrap the tiled bitmap around from the end of the strip to the start. 
 
 Copy the 10 pixel wide 'red-comet.bmp' file from 'examples/sprites/strip-10' to your flash storage.
 
@@ -129,7 +129,7 @@ Copy the 10 pixel wide 'red-comet.bmp' file from 'examples/sprites/strip-10' to 
     neopixels = neopixel.NeoPixel(board.D6, numPixels, auto_write=False)
 
     # Load the sprite from a BMP file.
-    sprite = neosprite.Sprite.open('red-comet.bmp')
+    sprite = neosprite.BmpSprite.open('red-comet.bmp')
 
     # Set the size of the sprite to 1 pixel tall.
     sprite.size = [sprite.size[0], 1]
@@ -137,7 +137,7 @@ Copy the 10 pixel wide 'red-comet.bmp' file from 'examples/sprites/strip-10' to 
     range = (0, numPixels - 1)
     while True:
       # Display the RGB data on the NeoPixels
-      sprite.fillPixelBytes(neopixels.buf, pixelRange = range)
+      sprite.fillBuffer(neopixels.buf, pixelRange = range)
       neopixels.show()
       
       # Advance the output buffer range one position
@@ -194,7 +194,7 @@ You can use the following code snippet to estimate the power consumption of a lo
 .. code-block::
 
     # Helper function to calculate the total brightness percentage of the entire sprite
-    def calcTotalBrightness(sprite, channels = None):
+    def calcTotalBrightness(sprite, channels = neosprite.PixelLayout_NeoPixel_GRB):
       # Save the current size and offset
       size = sprite.size
       offset = sprite.offset
@@ -202,7 +202,9 @@ You can use the following code snippet to estimate the power consumption of a lo
       sprite.size = [sprite.bitmapWidth, sprite.bitmapHeight]
       sprite.offset = [0,0]
       # Get the pixel bytes
-      pixelBytes = sprite.getPixelByteArray(channels)
+      bytesPerPixel = 4 if channels[3] != 0xFF or channels[4] != 0XFF else 3
+      pixelBytes = bytearray(bytesPerPixel * sprite.size[0] * sprite.size[1])
+      sprite.fillBuffer(pixelBytes, channels)
       # Restore the size
       sprite.size = size
       sprite.offset = offset
@@ -234,7 +236,7 @@ If you really need to push pixel speed or minimize memory there are a few advanc
 1. **Create only 24 bits per pixel bitmaps.** 
 Since these map one byte of bitmap data to one byte in the LED output array there is minimal math and no palette color lookup in the pixel fill loop which will speed up animations dramatically.
 
-2. **Compile and use the optimized neosprite_24bpp_rgb library**
+2. **Compile and use the optimized neosprite_24bpp_neopixel_rgb library**
 This code has been optimized for 24bpp bitmaps on R,G,B NeoPixel strips by removing conditional logic checks inside the pixel fill loop and removing code to handle bitmaps at other bpp (1, 2, 4, 8, 32). So the code is faster and takes less memory.
 
 3. **Replace the NeoPixel python library with lower level calls**
@@ -256,7 +258,7 @@ Inside your animation loop add the following code:
 .. code-block::
 
   # Display the RGB data on the NeoPixels
-  sprite.fillPixelBytes(neopixels.buf)
+  sprite.fillBuffer(neopixels.buf)
   neopixel_write(neopixels.pin, neopixels.buf)
 
   

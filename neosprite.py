@@ -19,6 +19,12 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+
+# Minimize with:
+# https://liftoff.github.io/pyminifier/pyminifier.html
+# Compile with:
+# mpy-cross -O3 -s neosprite.py neosprite_24bpp_neopixel_rgb.py
+
 """
 `neosprite`
 ====================================================
@@ -51,143 +57,107 @@ Implementation Notes
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/aaronaverill/CircuitPython_neosprite.git"
 
-import array
 import gc
 import math
 import ustruct
 
-class PixelLayout(object):
-  NeoPixel_RGB = 1
-  NeoPixel_GRB = 2
-  NeoPixel_RGBW = 3
-  NeoPixel_GRBW = 4
+PixelLayout_NeoPixel_RGB = b'\x00\x01\x02\xFF\xFF'
+PixelLayout_NeoPixel_GRB = b'\x01\x00\x02\xFF\xFF'
+PixelLayout_NeoPixel_RGBW = b'\x00\x01\x02\x03\xFF'
+PixelLayout_NeoPixel_GRBW = b'\x01\x00\x02\x03\xFF'
+
+PixelLayout_DotStar_RGBA = b'\x01\x02\x03\xFF\x00'
+PixelLayout_DotStar_RBGA = b'\x01\x03\x02\xFF\x00'
+PixelLayout_DotStar_GRBA = b'\x02\x01\x03\xFF\x00'
+PixelLayout_DotStar_GBRA = b'\x02\x03\x01\xFF\x00'
+PixelLayout_DotStar_BRGA = b'\x03\x01\x02\xFF\x00'
+PixelLayout_DotStar_BGRA = b'\x03\x02\x01\xFF\x00'
+
+    
+class BmpSprite(object):
+  """A sprite sourced from a BMP file"""
   
-  DotStar_RGBA = 5
-  DotStar_RBGA = 6
-  DotStar_GRBA = 7
-  DotStar_GBRA = 8
-  DotStar_BRGA = 9
-  DotStar_BGRA = 10
-  
-  channelInfo = {
-    NeoPixel_RGB: (0, 1, 2),
-    NeoPixel_GRB: (1, 0, 2),
-    NeoPixel_RGBW: (0, 1, 2, 3),
-    NeoPixel_GRBW: (1, 0, 2, 3),
-    DotStar_RGBA: (1, 2, 3, 0),
-    DotStar_RBGA: (1, 3, 2, 0),
-    DotStar_GRBA: (2, 1, 3, 0),
-    DotStar_GBRA: (2, 3, 1, 0),
-    DotStar_BRGA: (3, 1, 2, 0),
-    DotStar_BGRA: (3, 2, 1, 0),
-  }
-  
-  whiteLayouts = [NeoPixel_RGBW, NeoPixel_GRBW]
-  alphaLayouts = [DotStar_RGBA, DotStar_RBGA, DotStar_GRBA, DotStar_GBRA, DotStar_BRGA, DotStar_BGRA]
-  
-class Sprite(object):
   def open(filename):
     fp = open(filename, 'rb')
-    
-    # Only BMP sprites are supported for now
     im = BmpSprite(fp)
     fp.close()
     fp = None
     gc.collect()
     return im
 
-class BmpSprite(object):
-  """A sprite sourced from a BMP file"""
-  
   def __init__(self, fp):
     fp.seek(0x00)
     fileType = fp.read(2)
     if fileType != b'BM':
-      raise ValueError('Not a bitmap file.')
+      if __debug__:
+        raise ValueError('Not a bitmap file.')
+      else:
+        raise ValueError(0)
     
-    self._readFile(fp)
-          
+    self._read(fp)
     self.size = [self.bitmapWidth, self.bitmapHeight]
     self.offset = [0, 0]
-    
-    self.byteFillStrategy = getattr(self, '_fillBytes_' + str(self.bitsPerPixel))
       
-  def _readFile(self, fp):
+  def _read(self, fp):
     fp.seek(0x0A)
     pixelArrayOffset = ustruct.unpack('<i', fp.read(4))[0]
     dibHeaderSize = ustruct.unpack('<i', fp.read(4))[0]
     self.bitmapWidth = ustruct.unpack('<i', fp.read(4))[0]
     self.bitmapHeight = ustruct.unpack('<i', fp.read(4))[0]
-    self.topToBottom = self.bitmapHeight < 0
+    self._topToBottom = self.bitmapHeight < 0
     self.bitmapHeight = abs(self.bitmapHeight)
     fp.seek(0x1C)
-    self.bitsPerPixel = ustruct.unpack('<i', fp.read(2))[0]
+    self._bitsPerPixel = ustruct.unpack('<i', fp.read(2))[0]
     bitmapCompression = ustruct.unpack('<i', fp.read(4))[0]
-    if self.bitsPerPixel < 24:
+    
+    if self._bitsPerPixel >= 24:
+      self.palette = None
+      self.byteFillStrategy = self._f24
+      self.transformRgb = self._t24
+    else:
       fp.seek(0x2E)
       paletteSize = ustruct.unpack('<i', fp.read(4))[0]
       if paletteSize == 0:
-        paletteSize = 2 ** self.bitsPerPixel
+        paletteSize = 2 ** self._bitsPerPixel
       fp.seek(14 + dibHeaderSize)
       self.palette = bytearray(fp.read(paletteSize*4))
+      self.byteFillStrategy = self._fP
+      self.transformRgb = self._tP
+
+    if self._bitsPerPixel < 8:
+      self._bitmapBytesPerCol = self._bitsPerPixel / 8
     else:
-      self.palette = None
-    self.bitmapRowBytes = math.floor((self.bitsPerPixel * self.bitmapWidth + 31)/32) * 4
-    self.bitmapBytesPerCol = self.bitsPerPixel / 8
-    if self.bitsPerPixel % 8 == 0:
-      self.bitmapBytesPerCol = int(self.bitmapBytesPerCol)
-    pixelArraySize = self.bitmapRowBytes * self.bitmapHeight
+      self._bitmapBytesPerCol = int(self._bitsPerPixel / 8)
+    
+    self._bitmapRowBytes = int(math.floor((self._bitsPerPixel * self.bitmapWidth + 31)/32) * 4)
+    pixelArraySize = self._bitmapRowBytes * self.bitmapHeight
     fp.seek(pixelArrayOffset)
     self.pixelArrayData = bytearray(fp.read(pixelArraySize))
     
     if dibHeaderSize != 40:
-      raise ValueError('Cannot read bitmap header type = ' + str(dibHeaderSize))
+      if __debug__:
+        raise ValueError('Cannot read bitmap header type = ' + str(dibHeaderSize))
+      else:
+        raise ValueError(1)
     if bitmapCompression != 0:
-      raise ValueError('Cannot read compression type = ' + str(bitmapCompression))
-    if self.bitsPerPixel not in [32, 24, 8, 4, 1]:
-      raise ValueError('Cannot read ' + str(self.bitsPerPixel) + ' bits per pixel')
+      if __debug__:
+        raise ValueError('Cannot read compression type = ' + str(bitmapCompression))
+      else:
+        raise ValueError(2)
+    if self._bitsPerPixel not in [32, 24, 8, 4, 1]:
+      if __debug__:
+        raise ValueError('Cannot read ' + str(self._bitsPerPixel) + ' bits per pixel')
+      else:
+        raise ValueError(3)
+        
   
-  def transformRgb(self, transform):
-    if self.palette is None:
-      data = self.pixelArrayData
-      rgbBytes = int(self.bitsPerPixel / 8)
-    else:
-      data = self.palette
-      rgbBytes = 4
-      
-    # Check if the pixel array data is aligned 
-    if self.palette is None and self.bitmapRowBytes % rgbBytes != 0:
-      for row in range(0,self.bitmapHeight):
-        for col in range(0,self.bitmapWidth):
-          i = row * self.bitmapRowBytes + col * self.bitmapBytesPerCol
-          rgb = transform((data[i+2], data[i+1], data[i]))
-          for p in range(len(rgb)):
-            data[i+2-p] = rgb[p]
-    else:
-      for i in range(0, len(data), rgbBytes):
-        rgb = transform((data[i+2], data[i+1], data[i]))
-        for p in range(len(rgb)):
-          data[i+2-p] = rgb[p]
-
-  def getPixelByteArray(self, channels = None, pixelRange = None, bufferByteStart = 0):
-    if channels is None:
-      channels = PixelLayout.NeoPixel_GRB
-    
-    bufferBytesPerPixel = len(PixelLayout.channelInfo[channels])
-    buffer = bytearray(bufferBytesPerPixel * self.size[0] * self.size[1])
-    self.fillPixelBytes(buffer, channels, pixelRange, bufferByteStart)
-    return buffer
-  
-  def fillPixelBytes(self, buffer, channels = None, pixelRange = None, bufferByteStart = 0):
-    if channels is None:
-      channels = PixelLayout.NeoPixel_GRB
-
+  def fillBuffer(self, buffer, channels = PixelLayout_NeoPixel_GRB, pixelRange = None, bufferByteStart = 0):
     if pixelRange is None:
       bufferLen = len(buffer)
-      bufferBytesPerPixel = len(PixelLayout.channelInfo[channels])
+      bufferBytesPerPixel = 4 if channels[3] != 0xFF or channels[4] != 0XFF else 3
       pixelRange = (0, int(bufferLen / bufferBytesPerPixel) - 1)
 
-    if self.topToBottom:
+    if self._topToBottom:
       rows = range(self.offset[1], self.offset[1] + self.size[1])
     else:
       rows = range(self.bitmapHeight - self.offset[1] - 1, self.bitmapHeight - self.offset[1] - self.size[1] - 1, -1)
@@ -197,16 +167,17 @@ class BmpSprite(object):
       
     return buffer
 
-  def _fillBytes_32(self, rows, cols, buffer, channels, pixelRange, bufferByteStart):
-    self._fillBytes_24(rows, cols, buffer, channels, pixelRange, bufferByteStart)
-    
-  def _fillBytes_24(self, rows, cols, buffer, channels, pixelRange, bufferByteStart):
-    channelOffsets, bufferBytesPerPixel, hasWhite, hasAlpha = self._getChannelInfo(channels)
-    bufferPos, bufferEndPos, bufferLen = self._getByteRangeInfo(buffer, bufferByteStart, bufferBytesPerPixel, pixelRange)
+  def _f24(self, rows, cols, buffer, channels, pixelRange, bufferByteStart):
+    bufferBytesPerPixel = 4 if channels[3] != 0xFF or channels[4] != 0XFF else 3
+    hasWhite = channels[3] != 0xFF
+    hasAlpha = channels[4] != 0XFF
+    bufferPos = bufferByteStart + pixelRange[0] * bufferBytesPerPixel
+    bufferEndPos = bufferByteStart + pixelRange[1] * bufferBytesPerPixel
+    bufferLen = len(buffer)
     
     while True:
       for row in rows:
-        pixelPos = row * self.bitmapRowBytes + cols[0] * self.bitmapBytesPerCol
+        pixelPos = row * self._bitmapRowBytes + cols[0] * self._bitmapBytesPerCol
         for col in cols:
           # Extract the r, g, b data directly from the pixel array data
           r = self.pixelArrayData[pixelPos+2]
@@ -214,118 +185,97 @@ class BmpSprite(object):
           b = self.pixelArrayData[pixelPos]
           
           # Copy the r,g,b data into the buffer
-          # This inner loop code is repeated to avoid function call overhead
           if hasWhite:
             w = 0
             if r == g and g == b:
               w = r
               r = g = b = 0
-            buffer[bufferPos+channelOffsets[3]] = w
+            buffer[bufferPos+channels[3]] = w
           elif hasAlpha:
-            buffer[bufferPos+channelOffsets[3]] = 0xFF
-          buffer[bufferPos+channelOffsets[0]] = r
-          buffer[bufferPos+channelOffsets[1]] = g
-          buffer[bufferPos+channelOffsets[2]] = b
-          if bufferPos == bufferEndPos:
-            return
-          bufferPos += bufferBytesPerPixel
-          if (bufferPos >= bufferLen):
-            bufferPos = 0
-          pixelPos += self.bitmapBytesPerCol
-  
-  def _fillBytes_8(self, rows, cols, buffer, channels, pixelRange, bufferByteStart):
-    channelOffsets, bufferBytesPerPixel, hasWhite, hasAlpha = self._getChannelInfo(channels)
-    bufferPos, bufferEndPos, bufferLen = self._getByteRangeInfo(buffer, bufferByteStart, bufferBytesPerPixel, pixelRange)
-    
-    while True:
-      for row in rows:
-        pixelPos = row * self.bitmapRowBytes + cols[0]
-        for col in cols:
-          # Extract the palette position from the pixel array data
-          # Palette entries are always 4 bytes so the position is left shifted twice to get the byte offset
-          iPalette = self.pixelArrayData[pixelPos] << 2
-          # Extract the r, g, b data from the palette byte offset
-          r = self.palette[iPalette+2]
-          g = self.palette[iPalette+1]
-          b = self.palette[iPalette]
+            buffer[bufferPos+channels[3]] = 0xFF
+          buffer[bufferPos+channels[0]] = r
+          buffer[bufferPos+channels[1]] = g
+          buffer[bufferPos+channels[2]] = b
           
-          # Copy the r,g,b data into the buffer
-          # This inner loop code is repeated to avoid function call overhead
-          if hasWhite:
-            w = 0
-            if r == g and g == b:
-              w = r
-              r = g = b = 0
-            buffer[bufferPos+channelOffsets[3]] = w
-          elif hasAlpha:
-            buffer[bufferPos+channelOffsets[3]] = 0xFF
-          buffer[bufferPos+channelOffsets[0]] = r
-          buffer[bufferPos+channelOffsets[1]] = g
-          buffer[bufferPos+channelOffsets[2]] = b
           if bufferPos == bufferEndPos:
             return
           bufferPos += bufferBytesPerPixel
           if (bufferPos >= bufferLen):
             bufferPos = 0
-          pixelPos += self.bitmapBytesPerCol
+          pixelPos += self._bitmapBytesPerCol
     
-  def _fillBytes_4(self, rows, cols, buffer, channels, pixelRange, bufferByteStart):
-    self._fillBytes_Palette(4, rows, cols, buffer, channels, pixelRange, bufferByteStart)
-  
-  def _fillBytes_1(self, rows, cols, buffer, channels, pixelRange, bufferByteStart):
-    self._fillBytes_Palette(1, rows, cols, buffer, channels, pixelRange, bufferByteStart)
-  
-  def _fillBytes_Palette(self, bpp, rows, cols, buffer, channels, pixelRange, bufferByteStart):
-    channelOffsets, bufferBytesPerPixel, hasWhite, hasAlpha = self._getChannelInfo(channels)
-    bufferPos, bufferEndPos, bufferLen = self._getByteRangeInfo(buffer, bufferByteStart, bufferBytesPerPixel, pixelRange)
+  def _t24(self, transform):
+    data = self.pixelArrayData
+    rgbBytes = self._bitmapBytesPerCol
+    for row in range(0,self.bitmapHeight):
+      for col in range(0,self.bitmapWidth):
+        i = row * self._bitmapRowBytes + col * rgbBytes
+        rgb = transform((data[i+2], data[i+1], data[i]))
+        for p in range(len(rgb)):
+          data[i+2-p] = rgb[p]
+            
+  def _fP(self, rows, cols, buffer, channels, pixelRange, bufferByteStart):
+    bufferBytesPerPixel = 4 if channels[3] != 0xFF or channels[4] != 0XFF else 3
+    hasWhite = channels[3] != 0xFF
+    hasAlpha = channels[4] != 0XFF
+    bufferPos = bufferByteStart + pixelRange[0] * bufferBytesPerPixel
+    bufferEndPos = bufferByteStart + pixelRange[1] * bufferBytesPerPixel
+    bufferLen = len(buffer)
     
+    bpp = self._bitsPerPixel
     leftShift = int((8 / bpp) - 1)
     modulo = int(8 / bpp)
     bitMask = 2**bpp - 1
+    colOffset = cols[0] % modulo
+    colByteStart = int(cols[0] * self._bitmapBytesPerCol)
     
     while True:
       for row in rows:
+        colByte = colOffset
+        pixelPos = row * self._bitmapRowBytes + colByteStart
         for col in cols:
-          # Extract the palette position from the pixel array data
-          # Sub-byte pixel data needs to be bit shifted and masked to get the position
-          # There's probably a more efficient way to do this but I'm bad at math and this confuses me
-          bitshift = bpp * (leftShift - (col % modulo))
-          pixelPos = int(row * self.bitmapRowBytes + col * self.bitmapBytesPerCol)
-          iPalette = ((self.pixelArrayData[pixelPos] & (bitMask << bitshift)) >> bitshift) << 2
+          if bpp == 8:
+            iPalette = self.pixelArrayData[pixelPos] << 2
+            pixelPos += 1
+          else:  
+            # Extract the palette position from the pixel array data
+            # Sub-byte pixel data needs to be bit shifted and masked to get the position
+            # There's probably a more efficient way to do this but I'm bad at math and this confuses me
+            bitshift = bpp * (leftShift - colByte)
+            iPalette = ((self.pixelArrayData[pixelPos] & (bitMask << bitshift)) >> bitshift) << 2
+            colByte += 1
+            if colByte >= modulo:
+              colByte = 0
+              pixelPos += 1
+          
           # Extract the r, g, b data from the palette byte offset
           r = self.palette[iPalette+2]
           g = self.palette[iPalette+1]
           b = self.palette[iPalette]
           
           # Copy the r,g,b data into the buffer
-          # This inner loop code is repeated to avoid function call overhead
           if hasWhite:
             w = 0
             if r == g and g == b:
               w = r
               r = g = b = 0
-            buffer[bufferPos+channelOffsets[3]] = w
+            buffer[bufferPos+channels[3]] = w
           elif hasAlpha:
-            buffer[bufferPos+channelOffsets[3]] = 0xFF
-          buffer[bufferPos+channelOffsets[0]] = r
-          buffer[bufferPos+channelOffsets[1]] = g
-          buffer[bufferPos+channelOffsets[2]] = b
+            buffer[bufferPos+channels[3]] = 0xFF
+          buffer[bufferPos+channels[0]] = r
+          buffer[bufferPos+channels[1]] = g
+          buffer[bufferPos+channels[2]] = b
+          
           if bufferPos == bufferEndPos:
             return
           bufferPos += bufferBytesPerPixel
           if (bufferPos >= bufferLen):
             bufferPos = 0
     
-  def _getChannelInfo(self, channels):
-    offsets = PixelLayout.channelInfo[channels]
-    bpp = len(offsets)
-    hasWhite = False
-    hasAlpha = False
-    if channels in PixelLayout.whiteLayouts:
-      hasWhite = True
-    elif channels in PixelLayout.alphaLayouts:
-      hasAlpha = True
-    return (offsets, bpp, hasWhite, hasAlpha)
-    
-  def _getByteRangeInfo(self, buffer, bufferByteStart, bufferBytesPerPixel, pixelRange):
-    return (bufferByteStart + pixelRange[0] * bufferBytesPerPixel, bufferByteStart + pixelRange[1] * bufferBytesPerPixel, len(buffer)) 
+  def _tP(self, transform):
+      data = self.palette
+      rgbBytes = 4
+      for i in range(0, len(data), rgbBytes):
+        rgb = transform((data[i+2], data[i+1], data[i]))
+        for p in range(len(rgb)):
+          data[i+2-p] = rgb[p]

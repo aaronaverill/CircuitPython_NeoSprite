@@ -20,82 +20,92 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# Minimize with:
+# https://liftoff.github.io/pyminifier/pyminifier.html
+# Compile with:
+# mpy-cross -O3 -s neosprite.py neosprite_24bpp_neopixel_rgb.py
+
 # imports
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/aaronaverill/CircuitPython_neosprite.git"
 
 import gc
+import math
 import ustruct
 
-class PixelLayout(object):
-  NeoPixel_RGB = 1
-  NeoPixel_GRB = 2
-  
-  channelInfo = {
-    NeoPixel_RGB: (0, 1, 2),
-    NeoPixel_GRB: (1, 0, 2),
-  }
-  
-class Sprite(object):
+PixelLayout_NeoPixel_RGB = b'\x00\x01\x02\xFF\xFF'
+PixelLayout_NeoPixel_GRB = b'\x01\x00\x02\xFF\xFF'
+
+class BmpSprite_24bpp_NeoPixel_RGB(object):
   def open(filename):
     fp = open(filename, 'rb')
-    
-    # Only BMP sprites are supported for now
-    im = BmpSprite(fp)
+    im = BmpSprite_24bpp_NeoPixel_RGB(fp)
     fp.close()
     fp = None
     gc.collect()
     return im
-
-class BmpSprite(object):
+    
   def __init__(self, fp):
-    self._readFile(fp)
-    self.size = [self.bitmapWidth, self.bitmapHeight]
-    self.offset = [0, 0]
-      
-  def _readFile(self, fp):
-    err = 'Invalid bitmap.'
     fp.seek(0x00)
     fileType = fp.read(2)
     if fileType != b'BM':
-      raise ValueError(err)
+      if __debug__:
+        raise ValueError('Not a bitmap file.')
+      else:
+        raise ValueError(0)
       
-    ui = '<i'
+    self._read(fp)    
+    self.offset = [0, 0]
+    self.size = [self.bitmapWidth, self.bitmapHeight]
+  
+  def _read(self, fp):
     fp.seek(0x0A)
-    pixelArrayOffset = ustruct.unpack(ui, fp.read(4))[0]
-    dibHeaderSize = ustruct.unpack(ui, fp.read(4))[0]
-    self.bitmapWidth = ustruct.unpack(ui, fp.read(4))[0]
-    self.bitmapHeight = ustruct.unpack(ui, fp.read(4))[0]
+    pixelArrayOffset = ustruct.unpack('<i', fp.read(4))[0]
+    fp.seek(0x12)
+    self.bitmapWidth = ustruct.unpack('<i', fp.read(4))[0]
+    self.bitmapHeight = ustruct.unpack('<i', fp.read(4))[0]
     self.topToBottom = self.bitmapHeight < 0
     self.bitmapHeight = abs(self.bitmapHeight)
-    fp.seek(0x1C)
-    bitsPerPixel = ustruct.unpack(ui, fp.read(2))[0]
-    bitmapCompression = ustruct.unpack(ui, fp.read(4))[0]
-    self.bitmapRowBytes = int((bitsPerPixel * self.bitmapWidth + 31)/32) << 2
+    self.bitmapRowBytes = math.floor((24 * self.bitmapWidth + 31)/32) * 4
     pixelArraySize = self.bitmapRowBytes * self.bitmapHeight
     fp.seek(pixelArrayOffset)
     self.pixelArrayData = bytearray(fp.read(pixelArraySize))
     
-    if dibHeaderSize != 40 or bitmapCompression != 0 or bitsPerPixel not in [24]:
-      raise ValueError(err)
-  
+    if __debug__:
+      fp.seek(0x0E)
+      dibHeaderSize = ustruct.unpack('<i', fp.read(4))[0]
+      fp.seek(0x1C)
+      bitsPerPixel = ustruct.unpack('<i', fp.read(2))[0]
+      bitmapCompression = ustruct.unpack('<i', fp.read(4))[0]
+      if dibHeaderSize != 40:
+        raise ValueError('Cannot read bitmap header type = ' + str(dibHeaderSize))
+      if bitmapCompression != 0:
+        raise ValueError('Cannot read compression type = ' + str(bitmapCompression))
+      if bitsPerPixel != 24:
+        raise ValueError('Cannot read ' + str(bitsPerPixel) + ' bits per pixel')
+    
   def transformRgb(self, transform):
-    for row in range(0,self.bitmapHeight):
-      i = row * self.bitmapRowBytes
-      for col in range(0,self.bitmapWidth):
-        rgb = transform((self.pixelArrayData[i+2], self.pixelArrayData[i+1], self.pixelArrayData[i]))
+    data = self.pixelArrayData
+    rows = range(0,self.bitmapHeight)
+    cols = range(0,self.bitmapWidth)
+    bitmapRowBytes = self.bitmapRowBytes
+    
+    for row in rows:
+      for col in cols:
+        i = row * bitmapRowBytes + col * 3
+        rgb = transform((data[i+2], data[i+1], data[i]))
         for p in range(len(rgb)):
-          self.pixelArrayData[i+2-p] = rgb[p]
-        i += 3
-
-  def fillPixelBytes(self, buffer, channels = None, pixelRange = None):
-    if channels is None:
-      channels = PixelLayout.NeoPixel_GRB
-
+          data[i+2-p] = rgb[p]
+          
+  def fillBuffer(self, buffer, channels = b'\x01\x00\x02', pixelRange = None):
+    if __debug__:
+      if channels not in [b'\x01\x00\x02', b'\x00\x01\x02\xFF\xFF', b'\x01\x00\x02\xFF\xFF']:
+        raise ValueError('Invalid channels type.')
+        
     bufferLen = len(buffer)
+    bufferBytesPerPixel = len(channels)
     if pixelRange is None:
-      bufferBytesPerPixel = len(PixelLayout.channelInfo[channels])
       pixelRange = (0, int(bufferLen / bufferBytesPerPixel) - 1)
 
     if self.topToBottom:
@@ -104,8 +114,6 @@ class BmpSprite(object):
       rows = range(self.bitmapHeight - self.offset[1] - 1, self.bitmapHeight - self.offset[1] - self.size[1] - 1, -1)
     cols = range(self.offset[0], self.offset[0] + self.size[0])
     
-    channelOffsets = PixelLayout.channelInfo[channels]
-    bufferBytesPerPixel = len(channelOffsets)
     bufferPos = pixelRange[0] * bufferBytesPerPixel
     bufferEndPos = pixelRange[1] * bufferBytesPerPixel
     
@@ -120,9 +128,9 @@ class BmpSprite(object):
           
           # Copy the r,g,b data into the buffer
           # This inner loop code is repeated to avoid function call overhead
-          buffer[bufferPos+channelOffsets[0]] = r
-          buffer[bufferPos+channelOffsets[1]] = g
-          buffer[bufferPos+channelOffsets[2]] = b
+          buffer[bufferPos+channels[0]] = r
+          buffer[bufferPos+channels[1]] = g
+          buffer[bufferPos+channels[2]] = b
           if bufferPos == bufferEndPos:
             return
           bufferPos += bufferBytesPerPixel

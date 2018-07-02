@@ -23,7 +23,7 @@ def getFilesRecursive(folder):
   return files
 
 # Helper function to calculate the total brightness percentage of the entire sprite
-def calcTotalBrightness(sprite, channels = None):
+def calcTotalBrightness(sprite, channels = neosprite.PixelLayout_NeoPixel_GRB):
   # Save the current size and offset
   size = sprite.size
   offset = sprite.offset
@@ -31,7 +31,9 @@ def calcTotalBrightness(sprite, channels = None):
   sprite.size = [sprite.bitmapWidth, sprite.bitmapHeight]
   sprite.offset = [0,0]
   # Get the pixel bytes
-  pixelBytes = sprite.getPixelByteArray(channels)
+  bytesPerPixel = 4 if channels[3] != 0xFF or channels[4] != 0XFF else 3
+  pixelBytes = bytearray(bytesPerPixel * sprite.size[0] * sprite.size[1])
+  sprite.fillBuffer(pixelBytes, channels)
   # Restore the size
   sprite.size = size
   sprite.offset = offset
@@ -83,10 +85,16 @@ while True:
     gc.collect()
     
     # Load a new sprite
-    print('Showing',spriteFile)
-    sprite = neosprite.Sprite.open(spriteFile)
-    sprite.size = matrixSize
+    print('\nShowing',spriteFile)
+    try:
+      sprite = neosprite.BmpSprite.open(spriteFile)
+      sprite.size = matrixSize
+    except Exception as e:
+      print('Bitmap load error.', str(e))
     
+    if sprite is None:
+      continue
+
     # Adjust the brightness
     if brightness <= 0.99:
       setBrightness = lambda rgb: (int(rgb[0] * brightness), int(rgb[1] * brightness), int(rgb[2] * brightness))
@@ -111,7 +119,7 @@ while True:
         sprite.offset = [0, yPos]
         
         # Display the RGB data on the NeoPixels
-        sprite.fillPixelBytes(neopixels.buf, channels=neosprite.PixelLayout.NeoPixel_GRB)
+        sprite.fillBuffer(neopixels.buf)
         neopixels.show()
       
         frames += 1
