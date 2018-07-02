@@ -151,7 +151,10 @@ class BmpSprite(object):
         raise ValueError(3)
         
   
-  def fillBuffer(self, buffer, channels = PixelLayout_NeoPixel_GRB, pixelRange = None, bufferByteStart = 0):
+  def fillBuffer(self, buffer, channels = PixelLayout_NeoPixel_GRB, blend = None, pixelRange = None, bufferByteStart = 0):
+    if blend is not None:
+      blend = max(0, min(1, blend))
+    
     if pixelRange is None:
       bufferLen = len(buffer)
       bufferBytesPerPixel = 4 if channels[3] != 0xFF or channels[4] != 0XFF else 3
@@ -163,11 +166,11 @@ class BmpSprite(object):
       rows = range(self.bitmapHeight - self.offset[1] - 1, self.bitmapHeight - self.offset[1] - self.size[1] - 1, -1)
     cols = range(self.offset[0], self.offset[0] + self.size[0])
     
-    self.byteFillStrategy(rows, cols, buffer, channels, pixelRange, bufferByteStart)
+    self.byteFillStrategy(rows, cols, buffer, channels, blend, pixelRange, bufferByteStart)
       
     return buffer
 
-  def _f24(self, rows, cols, buffer, channels, pixelRange, bufferByteStart):
+  def _f24(self, rows, cols, buffer, channels, blend, pixelRange, bufferByteStart):
     bufferBytesPerPixel = 4 if channels[3] != 0xFF or channels[4] != 0XFF else 3
     hasWhite = channels[3] != 0xFF
     hasAlpha = channels[4] != 0XFF
@@ -190,9 +193,17 @@ class BmpSprite(object):
             if r == g and g == b:
               w = r
               r = g = b = 0
+            if blend is not None:
+              w = int(w * blend + (buffer[bufferPos+channels[3]] * (1 - blend)))
             buffer[bufferPos+channels[3]] = w
           elif hasAlpha:
             buffer[bufferPos+channels[3]] = 0xFF
+            
+          if blend is not None:
+            r = int(r * blend + (buffer[bufferPos+channels[0]] * (1 - blend)))
+            g = int(g * blend + (buffer[bufferPos+channels[1]] * (1 - blend)))
+            b = int(b * blend + (buffer[bufferPos+channels[2]] * (1 - blend)))
+              
           buffer[bufferPos+channels[0]] = r
           buffer[bufferPos+channels[1]] = g
           buffer[bufferPos+channels[2]] = b
@@ -214,7 +225,7 @@ class BmpSprite(object):
         for p in range(len(rgb)):
           data[i+2-p] = rgb[p]
             
-  def _fP(self, rows, cols, buffer, channels, pixelRange, bufferByteStart):
+  def _fP(self, rows, cols, buffer, channels, blend, pixelRange, bufferByteStart):
     bufferBytesPerPixel = 4 if channels[3] != 0xFF or channels[4] != 0XFF else 3
     hasWhite = channels[3] != 0xFF
     hasAlpha = channels[4] != 0XFF
@@ -259,9 +270,17 @@ class BmpSprite(object):
             if r == g and g == b:
               w = r
               r = g = b = 0
+            if blend is not None:
+              w = int(w * blend + (buffer[bufferPos+channels[3]] * (1 - blend)))
             buffer[bufferPos+channels[3]] = w
           elif hasAlpha:
             buffer[bufferPos+channels[3]] = 0xFF
+
+          if blend is not None:
+            r = int(r * blend + (buffer[bufferPos+channels[0]] * (1 - blend)))
+            g = int(g * blend + (buffer[bufferPos+channels[1]] * (1 - blend)))
+            b = int(b * blend + (buffer[bufferPos+channels[2]] * (1 - blend)))
+
           buffer[bufferPos+channels[0]] = r
           buffer[bufferPos+channels[1]] = g
           buffer[bufferPos+channels[2]] = b
