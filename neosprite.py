@@ -23,7 +23,7 @@
 # Minimize with:
 # https://liftoff.github.io/pyminifier/pyminifier.html
 # Compile with:
-# mpy-cross -O3 -s neosprite.py neosprite_24bpp_neopixel_rgb.py
+# mpy-cross -O3 -s neosprite.py neosprite.py
 
 """
 `neosprite`
@@ -58,8 +58,7 @@ __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/aaronaverill/CircuitPython_neosprite.git"
 
 import gc
-import math
-import ustruct
+import struct
 
 PixelLayout_NeoPixel_RGB = b'\x00\x01\x02\xFF\xFF'
 PixelLayout_NeoPixel_GRB = b'\x01\x00\x02\xFF\xFF'
@@ -100,15 +99,15 @@ class BmpSprite(object):
       
   def _read(self, fp):
     fp.seek(0x0A)
-    pixelArrayOffset = ustruct.unpack('<i', fp.read(4))[0]
-    dibHeaderSize = ustruct.unpack('<i', fp.read(4))[0]
-    self.bitmapWidth = ustruct.unpack('<i', fp.read(4))[0]
-    self.bitmapHeight = ustruct.unpack('<i', fp.read(4))[0]
+    pixelArrayOffset = struct.unpack('<i', fp.read(4))[0]
+    dibHeaderSize = struct.unpack('<i', fp.read(4))[0]
+    self.bitmapWidth = struct.unpack('<i', fp.read(4))[0]
+    self.bitmapHeight = struct.unpack('<i', fp.read(4))[0]
     self._topToBottom = self.bitmapHeight < 0
     self.bitmapHeight = abs(self.bitmapHeight)
     fp.seek(0x1C)
-    self._bitsPerPixel = ustruct.unpack('<i', fp.read(2))[0]
-    bitmapCompression = ustruct.unpack('<i', fp.read(4))[0]
+    self._bitsPerPixel = struct.unpack('<i', fp.read(2))[0]
+    bitmapCompression = struct.unpack('<i', fp.read(4))[0]
     
     if self._bitsPerPixel >= 24:
       self.palette = None
@@ -116,9 +115,9 @@ class BmpSprite(object):
       self.transformRgb = self._t24
     else:
       fp.seek(0x2E)
-      paletteSize = ustruct.unpack('<i', fp.read(4))[0]
+      paletteSize = struct.unpack('<i', fp.read(4))[0]
       if paletteSize == 0:
-        paletteSize = 2 ** self._bitsPerPixel
+        paletteSize = 1 << self._bitsPerPixel
       fp.seek(14 + dibHeaderSize)
       self.palette = bytearray(fp.read(paletteSize*4))
       self.byteFillStrategy = self._fP
@@ -129,7 +128,7 @@ class BmpSprite(object):
     else:
       self._bitmapBytesPerCol = int(self._bitsPerPixel / 8)
     
-    self._bitmapRowBytes = int(math.floor((self._bitsPerPixel * self.bitmapWidth + 31)/32) * 4)
+    self._bitmapRowBytes = int((self._bitsPerPixel * self.bitmapWidth + 31)/32) * 4
     pixelArraySize = self._bitmapRowBytes * self.bitmapHeight
     fp.seek(pixelArrayOffset)
     self.pixelArrayData = bytearray(fp.read(pixelArraySize))
