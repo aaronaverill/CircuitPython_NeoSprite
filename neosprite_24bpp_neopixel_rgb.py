@@ -31,11 +31,21 @@ __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/aaronaverill/CircuitPython_neosprite.git"
 
 import gc
-import math
-import ustruct
 
 PixelLayout_NeoPixel_RGB = b'\x00\x01\x02\xFF\xFF'
 PixelLayout_NeoPixel_GRB = b'\x01\x00\x02\xFF\xFF'
+
+def toInt(bytes):
+  value = 0
+  shift = 0
+  for byte in bytes:
+    value += byte << shift
+    shift = shift + 8
+    
+  if value & 0x80000000 == 0x80000000:
+    return -(value & 0x80000000) + (value & ~0x80000000)
+  else:
+    return value
 
 class BmpSprite_24bpp_NeoPixel_RGB(object):
   def open(filename):
@@ -61,23 +71,23 @@ class BmpSprite_24bpp_NeoPixel_RGB(object):
   
   def _read(self, fp):
     fp.seek(0x0A)
-    pixelArrayOffset = ustruct.unpack('<i', fp.read(4))[0]
+    pixelArrayOffset = toInt(fp.read(4))
     fp.seek(0x12)
-    self.bitmapWidth = ustruct.unpack('<i', fp.read(4))[0]
-    self.bitmapHeight = ustruct.unpack('<i', fp.read(4))[0]
+    self.bitmapWidth = toInt(fp.read(4))
+    self.bitmapHeight = toInt(fp.read(4))
     self.topToBottom = self.bitmapHeight < 0
     self.bitmapHeight = abs(self.bitmapHeight)
-    self.bitmapRowBytes = math.floor((24 * self.bitmapWidth + 31)/32) * 4
+    self.bitmapRowBytes = int((24 * self.bitmapWidth + 31)/32) <<2
     pixelArraySize = self.bitmapRowBytes * self.bitmapHeight
     fp.seek(pixelArrayOffset)
     self.pixelArrayData = bytearray(fp.read(pixelArraySize))
     
     if __debug__:
       fp.seek(0x0E)
-      dibHeaderSize = ustruct.unpack('<i', fp.read(4))[0]
+      dibHeaderSize = toInt(fp.read(4))
       fp.seek(0x1C)
-      bitsPerPixel = ustruct.unpack('<i', fp.read(2))[0]
-      bitmapCompression = ustruct.unpack('<i', fp.read(4))[0]
+      bitsPerPixel = toInt(fp.read(2))
+      bitmapCompression = toInt(fp.read(4))
       if dibHeaderSize != 40:
         raise ValueError('Cannot read bitmap header type = ' + str(dibHeaderSize))
       if bitmapCompression != 0:

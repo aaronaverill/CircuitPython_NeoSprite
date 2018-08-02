@@ -129,6 +129,8 @@ class BmpSprite(object):
       if paletteSize == 0:
         paletteSize = 1 << self._bitsPerPixel
       fp.seek(14 + dibHeaderSize)
+      # TODO: We only need the blue, green, red bytes from the palette.
+      # Tossing out the 4'th 0x00 byte will save us some memory.
       self.palette = bytearray(fp.read(paletteSize*4))
       self.byteFillStrategy = self._fP
       self.transformRgb = self._tP
@@ -138,7 +140,7 @@ class BmpSprite(object):
     else:
       self._bitmapBytesPerCol = int(self._bitsPerPixel / 8)
     
-    self._bitmapRowBytes = int((self._bitsPerPixel * self.bitmapWidth + 31)/32) * 4
+    self._bitmapRowBytes = int((self._bitsPerPixel * self.bitmapWidth + 31)/32) << 2
     pixelArraySize = self._bitmapRowBytes * self.bitmapHeight
     fp.seek(pixelArrayOffset)
     self.pixelArrayData = bytearray(fp.read(pixelArraySize))
@@ -268,6 +270,8 @@ class BmpSprite(object):
               colByte = 0
               pixelPos += 1
           
+          # TODO: Change palette to 3 bytes per pixel
+          # iPalette *= 3
           iPalette = iPalette << 2
           # Extract the r, g, b data from the palette byte offset
           r = self.palette[iPalette+2]
