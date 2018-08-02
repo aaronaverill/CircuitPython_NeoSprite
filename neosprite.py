@@ -58,7 +58,6 @@ __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/aaronaverill/CircuitPython_neosprite.git"
 
 import gc
-import struct
 
 PixelLayout_NeoPixel_RGB = b'\x00\x01\x02\xFF\xFF'
 PixelLayout_NeoPixel_GRB = b'\x01\x00\x02\xFF\xFF'
@@ -72,7 +71,18 @@ PixelLayout_DotStar_GBRA = b'\x02\x03\x01\xFF\x00'
 PixelLayout_DotStar_BRGA = b'\x03\x01\x02\xFF\x00'
 PixelLayout_DotStar_BGRA = b'\x03\x02\x01\xFF\x00'
 
+def toInt(bytes):
+  value = 0
+  shift = 0
+  for byte in bytes:
+    value += byte << shift
+    shift = shift + 8
     
+  if value & 0x80000000 == 0x80000000:
+    return -(value & 0x80000000) + (value & ~0x80000000)
+  else:
+    return value
+  
 class BmpSprite(object):
   """A sprite sourced from a BMP file"""
   
@@ -99,15 +109,15 @@ class BmpSprite(object):
       
   def _read(self, fp):
     fp.seek(0x0A)
-    pixelArrayOffset = struct.unpack('<i', fp.read(4))[0]
-    dibHeaderSize = struct.unpack('<i', fp.read(4))[0]
-    self.bitmapWidth = struct.unpack('<i', fp.read(4))[0]
-    self.bitmapHeight = struct.unpack('<i', fp.read(4))[0]
+    pixelArrayOffset = toInt(fp.read(4))
+    dibHeaderSize = toInt(fp.read(4))
+    self.bitmapWidth = toInt(fp.read(4))
+    self.bitmapHeight = toInt(fp.read(4))
     self._topToBottom = self.bitmapHeight < 0
     self.bitmapHeight = abs(self.bitmapHeight)
     fp.seek(0x1C)
-    self._bitsPerPixel = struct.unpack('<i', fp.read(2))[0]
-    bitmapCompression = struct.unpack('<i', fp.read(4))[0]
+    self._bitsPerPixel = toInt(fp.read(2))
+    bitmapCompression = toInt(fp.read(4))
     
     if self._bitsPerPixel >= 24:
       self.palette = None
@@ -115,7 +125,7 @@ class BmpSprite(object):
       self.transformRgb = self._t24
     else:
       fp.seek(0x2E)
-      paletteSize = struct.unpack('<i', fp.read(4))[0]
+      paletteSize = toInt(fp.read(4))
       if paletteSize == 0:
         paletteSize = 1 << self._bitsPerPixel
       fp.seek(14 + dibHeaderSize)
@@ -245,19 +255,20 @@ class BmpSprite(object):
         pixelPos = row * self._bitmapRowBytes + colByteStart
         for col in cols:
           if bpp == 8:
-            iPalette = self.pixelArrayData[pixelPos] << 2
+            iPalette = self.pixelArrayData[pixelPos]
             pixelPos += 1
           else:  
             # Extract the palette position from the pixel array data
             # Sub-byte pixel data needs to be bit shifted and masked to get the position
             # There's probably a more efficient way to do this but I'm bad at math and this confuses me
             bitshift = bpp * (leftShift - colByte)
-            iPalette = ((self.pixelArrayData[pixelPos] & (bitMask << bitshift)) >> bitshift) << 2
+            iPalette = (self.pixelArrayData[pixelPos] & (bitMask << bitshift)) >> bitshift
             colByte += 1
             if colByte >= modulo:
               colByte = 0
               pixelPos += 1
           
+          iPalette = iPalette << 2
           # Extract the r, g, b data from the palette byte offset
           r = self.palette[iPalette+2]
           g = self.palette[iPalette+1]
