@@ -131,7 +131,7 @@ class BmpSprite(object):
       fp.seek(14 + dibHeaderSize)
       # We only need the blue, green, red bytes from the palette, toss every 4th byte.
       self.palette = bytearray(paletteSize * 3)
-      for i in range(0, paletteSize, 3):
+      for i in range(0, paletteSize*3, 3):
         self.palette[i : (i + 3)] = fp.read(3)
         fp.seek(1, 1)
     
@@ -307,9 +307,9 @@ class BmpSprite(object):
             bufferPos = 0
     
   def _tP(self, transform):
-      data = self.palette
-      rgbBytes = 3
-      for i in range(0, len(data), rgbBytes):
-        rgb = transform((data[i+2], data[i+1], data[i]))
-        for p in range(len(rgb)):
-          data[i+2-p] = rgb[p]
+    data = self.palette
+    rgbBytes = 3
+    for i in range(0, len(data), rgbBytes):
+      rgb = transform((data[i+2], data[i+1], data[i]))
+      for p in range(len(rgb)):
+        data[i+2-p] = rgb[p]
