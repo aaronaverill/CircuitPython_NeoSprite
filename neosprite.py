@@ -71,17 +71,17 @@ PixelLayout_DotStar_GBRA = b'\x02\x03\x01\xFF\x00'
 PixelLayout_DotStar_BRGA = b'\x03\x01\x02\xFF\x00'
 PixelLayout_DotStar_BGRA = b'\x03\x02\x01\xFF\x00'
 
+# Declare a python function to convert an array of bytes into a 2 byte integer
+# This code avoids the use of the struct module which is quite large
+# Replaces struct.unpack("<i"). Silly!
 def toInt(bytes):
-  value = 0
-  shift = 0
-  for byte in bytes:
-    value += byte << shift
-    shift = shift + 8
-    
-  if value & 0x80000000 == 0x80000000:
-    return -(value & 0x80000000) + (value & ~0x80000000)
-  else:
-    return value
+  value = bytes[0] + (bytes[1] << 8)
+  if len(bytes) == 4 and (bytes[3] & 0x80):
+    if __debug__:
+      raise ValueError('Cannot read top to bottom bitmap.')
+    else:
+      raise ValueError(4)
+  return value
   
 class BmpSprite(object):
   """A sprite sourced from a BMP file"""
@@ -129,9 +129,12 @@ class BmpSprite(object):
       if paletteSize == 0:
         paletteSize = 1 << self._bitsPerPixel
       fp.seek(14 + dibHeaderSize)
-      # TODO: We only need the blue, green, red bytes from the palette.
-      # Tossing out the 4'th 0x00 byte will save us some memory.
-      self.palette = bytearray(fp.read(paletteSize*4))
+      # We only need the blue, green, red bytes from the palette, toss every 4th byte.
+      self.palette = bytearray(paletteSize * 3)
+      for i in range(0, paletteSize, 3):
+        self.palette[i : (i + 3)] = fp.read(3)
+        fp.seek(1, 1)
+    
       self.byteFillStrategy = self._fP
       self.transformRgb = self._tP
 
@@ -270,9 +273,7 @@ class BmpSprite(object):
               colByte = 0
               pixelPos += 1
           
-          # TODO: Change palette to 3 bytes per pixel
-          # iPalette *= 3
-          iPalette = iPalette << 2
+          iPalette *= 3
           # Extract the r, g, b data from the palette byte offset
           r = self.palette[iPalette+2]
           g = self.palette[iPalette+1]
@@ -307,7 +308,7 @@ class BmpSprite(object):
     
   def _tP(self, transform):
       data = self.palette
-      rgbBytes = 4
+      rgbBytes = 3
       for i in range(0, len(data), rgbBytes):
         rgb = transform((data[i+2], data[i+1], data[i]))
         for p in range(len(rgb)):

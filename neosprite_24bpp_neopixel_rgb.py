@@ -35,17 +35,17 @@ import gc
 PixelLayout_NeoPixel_RGB = b'\x00\x01\x02\xFF\xFF'
 PixelLayout_NeoPixel_GRB = b'\x01\x00\x02\xFF\xFF'
 
+# Declare a python function to convert an array of bytes into a 2 byte integer
+# This code avoids the use of the struct module which is quite large
+# Replaces struct.unpack("<i"). Silly!
 def toInt(bytes):
-  value = 0
-  shift = 0
-  for byte in bytes:
-    value += byte << shift
-    shift = shift + 8
-    
-  if value & 0x80000000 == 0x80000000:
-    return -(value & 0x80000000) + (value & ~0x80000000)
-  else:
-    return value
+  value = bytes[0] + (bytes[1] << 8)
+  if len(bytes) == 4 and (bytes[3] & 0x80):
+    if __debug__:
+      raise ValueError('Cannot read top to bottom bitmap.')
+    else:
+      raise ValueError(4)
+  return value
 
 class BmpSprite_24bpp_NeoPixel_RGB(object):
   def open(filename):
